@@ -1,0 +1,58 @@
+apiVersion: v2
+name: mcp-platform
+description: A Helm chart for MCP Security Assessment Platform
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/your-org/mcp-security-platform
+maintainers:
+  - name: MCP Security Team
+    email: security@mcp-platform.com
+sources:
+  - https://github.com/your-org/mcp-security-platform
+keywords:
+  - security
+  - vulnerability
+  - scanning
+  - assessment
+  - microservices
+  - mcp
+type: application
+kubeVersion: ">=1.21.0-0 <1.33.0-0"
+deprecated: false
+annotations:
+  category: Security
+  licenses: MIT
+  images: |
+    - name: auth
+      image: ghcr.io/your-org/mcp-security-platform-auth:0.1.0
+    - name: gateway
+      image: ghcr.io/your-org/mcp-security-platform-gateway:0.1.0
+    - name: scanner-manager
+      image: ghcr.io/your-org/mcp-security-platform-scanner-manager:0.1.0
+    - name: vulnerability-analyzer
+      image: ghcr.io/your-org/mcp-security-platform-vulnerability-analyzer:0.1.0
+    - name: report-generator
+      image: ghcr.io/your-org/mcp-security-platform-report-generator:0.1.0
+    - name: notification
+      image: ghcr.io/your-org/mcp-security-platform-notification:0.1.0
+    - name: postgresql
+      image: postgres:15-alpine
+    - name: redis
+      image: redis:7-alpine
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: prometheus
+    version: "25.x.x"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  - name: grafana
+    version: "7.x.x"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled

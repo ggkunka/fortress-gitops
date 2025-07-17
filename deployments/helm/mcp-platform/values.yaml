@@ -1,0 +1,519 @@
+# Default values for MCP Security Assessment Platform
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePullSecrets: []
+  storageClass: ""
+  postgresql:
+    auth:
+      postgresPassword: "postgres"
+      username: "mcp_user"
+      password: "mcp_password"
+      database: "mcp_security"
+  redis:
+    auth:
+      enabled: true
+      password: "redis_password"
+
+# Image configuration
+image:
+  registry: ghcr.io
+  repository: your-org/mcp-security-platform
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Kubernetes version compatibility
+kubernetesVersion: "1.28.0"
+
+# Namespace configuration
+namespaceOverride: ""
+fullnameOverride: ""
+nameOverride: ""
+
+# Service Account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+  automountServiceAccountToken: true
+
+# RBAC configuration
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["secrets", "configmaps"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["batch"]
+      resources: ["jobs", "cronjobs"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+podSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: ""
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: mcp-security.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: mcp-platform-gateway
+            port: 80
+  tls:
+    - secretName: mcp-platform-tls
+      hosts:
+        - mcp-security.example.com
+
+# Services configuration
+services:
+  # Authentication Service
+  auth:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: auth
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://mcp_user:mcp_password@mcp-platform-postgresql:5432/mcp_security"
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+  # API Gateway Service
+  gateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: gateway
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+  # Scanner Manager Service
+  scannerManager:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: scanner-manager
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://mcp_user:mcp_password@mcp-platform-postgresql:5432/mcp_security"
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+  # Vulnerability Analyzer Service
+  vulnerabilityAnalyzer:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: vulnerability-analyzer
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://mcp_user:mcp_password@mcp-platform-postgresql:5432/mcp_security"
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+  # Report Generator Service
+  reportGenerator:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: report-generator
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://mcp_user:mcp_password@mcp-platform-postgresql:5432/mcp_security"
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+  # Notification Service
+  notification:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: notification
+      tag: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8000
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://mcp_user:mcp_password@mcp-platform-postgresql:5432/mcp_security"
+      - name: REDIS_URL
+        value: "redis://:redis_password@mcp-platform-redis:6379/0"
+      - name: ENVIRONMENT
+        value: "production"
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgres"
+    username: "mcp_user"
+    password: "mcp_password"
+    database: "mcp_security"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  readReplicas:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "redis_password"
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  replica:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+    ingress:
+      enabled: true
+      hosts:
+        - grafana.mcp-security.example.com
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: "7d"
+  storage:
+    size: 50Gi
+    storageClass: ""
+
+# Migration job configuration
+migration:
+  enabled: true
+  image:
+    repository: auth
+    tag: ""
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Configuration for different Kubernetes flavors
+kubernetesFlavorConfig:
+  # Vanilla Kubernetes
+  vanilla:
+    enabled: true
+    storageClass: "standard"
+    ingressClass: "nginx"
+  
+  # OpenShift
+  openshift:
+    enabled: false
+    storageClass: "ocs-storagecluster-ceph-rbd"
+    ingressClass: "openshift-default"
+    route:
+      enabled: true
+      host: "mcp-security.apps.openshift.example.com"
+      tls:
+        termination: edge
+    securityContextConstraints:
+      create: true
+      name: "mcp-platform-scc"
+  
+  # Amazon EKS
+  eks:
+    enabled: false
+    storageClass: "gp2"
+    ingressClass: "alb"
+    serviceAccount:
+      annotations:
+        eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/mcp-platform-role"
+    loadBalancer:
+      type: "nlb"
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+  
+  # Azure AKS
+  aks:
+    enabled: false
+    storageClass: "azure-disk"
+    ingressClass: "azure/application-gateway"
+    serviceAccount:
+      annotations:
+        azure.workload.identity/client-id: "12345678-1234-1234-1234-123456789012"
+    loadBalancer:
+      type: "LoadBalancer"
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  
+  # Google GKE
+  gke:
+    enabled: false
+    storageClass: "standard-rwo"
+    ingressClass: "gce"
+    serviceAccount:
+      annotations:
+        iam.gke.io/gcp-service-account: "mcp-platform@project-id.iam.gserviceaccount.com"
+    loadBalancer:
+      type: "LoadBalancer"
+      annotations:
+        cloud.google.com/load-balancer-type: "Internal"

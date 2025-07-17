@@ -1,0 +1,120 @@
+# Base Containerfile for MCP Security Platform services
+# Using Rocky Linux 9 for enterprise-grade security and stability
+FROM registry.access.redhat.com/ubi9/ubi:latest
+
+# Metadata
+LABEL maintainer="MCP Security Team <security@mcp-platform.com>" \
+      description="Base image for MCP Security Assessment Platform services" \
+      version="0.1.0" \
+      vendor="MCP Security Platform"
+
+# Build arguments
+ARG PYTHON_VERSION=3.11
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
+# Environment variables
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app \
+    PATH=/app/.local/bin:$PATH
+
+# Create non-root user for security
+RUN groupadd -r -g 1000 mcp && \
+    useradd -r -g mcp -u 1000 -d /app -s /bin/bash mcp && \
+    mkdir -p /app && \
+    chown -R mcp:mcp /app
+
+# Update system and install dependencies
+RUN dnf update -y && \
+    dnf install -y \
+        python${PYTHON_VERSION} \
+        python${PYTHON_VERSION}-pip \
+        python${PYTHON_VERSION}-devel \
+        gcc \
+        gcc-c++ \
+        make \
+        openssl-devel \
+        libffi-devel \
+        zlib-devel \
+        bzip2-devel \
+        readline-devel \
+        sqlite-devel \
+        wget \
+        curl \
+        git \
+        ca-certificates \
+        shadow-utils \
+        procps-ng \
+        net-tools \
+        bind-utils \
+        iputils \
+        && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Install security tools
+RUN dnf install -y \
+        gnupg2 \
+        openssl \
+        ca-certificates \
+        audit \
+        && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Set up Python environment
+RUN python${PYTHON_VERSION} -m pip install --upgrade pip setuptools wheel
+
+# Install common Python dependencies
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    pydantic==2.5.0 \
+    pydantic-settings==2.1.0 \
+    sqlalchemy==2.0.23 \
+    alembic==1.13.1 \
+    asyncpg==0.29.0 \
+    redis==5.0.1 \
+    httpx==0.25.2 \
+    structlog==23.2.0 \
+    prometheus-client==0.19.0 \
+    kubernetes==28.1.0 \
+    pyyaml==6.0.1 \
+    cryptography==41.0.8 \
+    bcrypt==4.1.2 \
+    python-jose[cryptography]==3.3.0 \
+    passlib[bcrypt]==1.7.4
+
+# Security configurations
+RUN echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su && \
+    echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su-l && \
+    sed -i 's/^PASS_MAX_DAYS.*$/PASS_MAX_DAYS 90/' /etc/login.defs && \
+    sed -i 's/^PASS_MIN_DAYS.*$/PASS_MIN_DAYS 7/' /etc/login.defs && \
+    sed -i 's/^PASS_WARN_AGE.*$/PASS_WARN_AGE 7/' /etc/login.defs
+
+# Create required directories
+RUN mkdir -p /app/logs /app/data /app/tmp /app/config && \
+    chown -R mcp:mcp /app
+
+# Switch to non-root user
+USER mcp
+
+# Set working directory
+WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose common ports
+EXPOSE 8000
+
+# Default command
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

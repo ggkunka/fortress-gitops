@@ -1,0 +1,293 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+    
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+    
+    - name: Install project
+      run: poetry install --no-interaction
+    
+    - name: Run security checks
+      run: |
+        poetry run bandit -r services/ shared/ -f json -o bandit-report.json
+        poetry run safety check --json --output safety-report.json
+    
+    - name: Run linting
+      run: |
+        poetry run black --check services/ shared/ tests/
+        poetry run isort --check-only services/ shared/ tests/
+        poetry run flake8 services/ shared/ tests/
+        poetry run mypy services/ shared/
+    
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+        ENVIRONMENT: test
+      run: |
+        poetry run pytest tests/ -v --cov=services --cov=shared --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+  build-images:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'release'
+    
+    strategy:
+      matrix:
+        service: [auth, gateway, scanner-manager, vulnerability-analyzer, report-generator, notification]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Buildah
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
+        tags: |
+          latest
+          ${{ github.sha }}
+          ${{ github.ref_name }}
+        containerfiles: |
+          ./deployments/docker/Containerfile.${{ matrix.service }}
+        context: .
+        extra-args: |
+          --build-arg SERVICE=${{ matrix.service }}
+          --build-arg VERSION=${{ github.ref_name }}
+          --build-arg COMMIT_SHA=${{ github.sha }}
+    
+    - name: Log in to Container Registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Push images
+      run: |
+        buildah push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
+        buildah push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
+        buildah push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }}
+
+  security-scan:
+    needs: build-images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'release'
+    
+    strategy:
+      matrix:
+        service: [auth, gateway, scanner-manager, vulnerability-analyzer, report-generator, notification]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+  deploy-staging:
+    needs: [test, build-images]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.13.0'
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: '1.28.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+    
+    - name: Deploy to staging
+      run: |
+        export KUBECONFIG=kubeconfig
+        helm upgrade --install mcp-security-platform-staging ./deployments/helm/mcp-platform \
+          --namespace mcp-security-staging \
+          --create-namespace \
+          --values ./deployments/helm/mcp-platform/values-staging.yaml \
+          --set image.tag=${{ github.sha }} \
+          --wait \
+          --timeout=600s
+
+  deploy-production:
+    needs: [test, build-images, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.13.0'
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: '1.28.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+    
+    - name: Deploy to production
+      run: |
+        export KUBECONFIG=kubeconfig
+        helm upgrade --install mcp-security-platform ./deployments/helm/mcp-platform \
+          --namespace mcp-security-production \
+          --create-namespace \
+          --values ./deployments/helm/mcp-platform/values-production.yaml \
+          --set image.tag=${{ github.event.release.tag_name }} \
+          --wait \
+          --timeout=600s
+
+  kubernetes-compatibility:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    
+    strategy:
+      matrix:
+        k8s-version: ['1.21.14', '1.22.17', '1.23.17', '1.24.15', '1.25.11', '1.26.6', '1.27.3', '1.28.0', '1.29.0', '1.30.0', '1.31.0', '1.32.0']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create K8s cluster
+      uses: helm/kind-action@v1
+      with:
+        node_image: kindest/node:v${{ matrix.k8s-version }}
+        cluster_name: test-cluster
+        config: |
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 30000
+              hostPort: 30000
+              protocol: TCP
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.13.0'
+    
+    - name: Test Helm chart
+      run: |
+        helm lint ./deployments/helm/mcp-platform
+        helm template mcp-security-platform ./deployments/helm/mcp-platform \
+          --values ./deployments/helm/mcp-platform/values.yaml \
+          --debug --validate
+    
+    - name: Install chart
+      run: |
+        helm install mcp-security-platform ./deployments/helm/mcp-platform \
+          --namespace mcp-security-test \
+          --create-namespace \
+          --values ./deployments/helm/mcp-platform/values.yaml \
+          --set image.tag=latest \
+          --wait \
+          --timeout=300s
+    
+    - name: Test deployment
+      run: |
+        kubectl get pods -n mcp-security-test
+        kubectl get services -n mcp-security-test
+        kubectl describe deployment -n mcp-security-test
