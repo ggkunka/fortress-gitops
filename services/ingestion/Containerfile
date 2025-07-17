@@ -1,0 +1,235 @@
+# Containerfile for MCP Security Platform - Ingestion Service
+# Base image: Rocky Linux 9 with Python 3.11
+
+FROM registry.access.redhat.com/ubi9/ubi:9.3 AS base
+
+# Metadata
+LABEL name="mcp-security-platform-ingestion" \
+      version="1.0.0" \
+      description="MCP Security Platform - Data Ingestion Service" \
+      maintainer="MCP Security Team" \
+      vendor="MCP Security Platform" \
+      summary="FastAPI-based ingestion service for SBOM, CVE, and runtime behavior data" \
+      io.k8s.description="Ingestion service for security data processing" \
+      io.k8s.display-name="MCP Ingestion Service" \
+      io.openshift.tags="mcp,security,ingestion,fastapi,python"
+
+# Install system dependencies
+RUN dnf update -y && \
+    dnf install -y \
+        python3.11 \
+        python3.11-pip \
+        python3.11-devel \
+        gcc \
+        gcc-c++ \
+        make \
+        git \
+        curl \
+        wget \
+        unzip \
+        tar \
+        gzip \
+        ca-certificates \
+        openssl \
+        openssl-devel \
+        libffi-devel \
+        zlib-devel \
+        bzip2-devel \
+        readline-devel \
+        sqlite-devel \
+        xz-devel \
+        tk-devel \
+        ncurses-devel \
+        expat-devel \
+        procps-ng \
+        net-tools \
+        telnet \
+        bind-utils \
+        jq \
+        shadow-utils && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Create application user and group
+RUN groupadd -r mcp && \
+    useradd -r -g mcp -d /app -s /bin/bash mcp && \
+    mkdir -p /app && \
+    chown -R mcp:mcp /app
+
+# Set Python 3.11 as default
+RUN alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.11 1
+
+# Upgrade pip and install build tools
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements files
+COPY requirements.txt requirements-test.txt ./
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt && \
+    pip3 install --no-cache-dir -r requirements-test.txt
+
+# Development stage
+FROM base AS development
+
+# Install development tools
+RUN pip3 install --no-cache-dir \
+    black \
+    flake8 \
+    isort \
+    mypy \
+    pre-commit \
+    pytest-watch \
+    ipython \
+    jupyter
+
+# Copy application code
+COPY --chown=mcp:mcp . .
+
+# Set environment variables for development
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=development \
+    LOG_LEVEL=DEBUG
+
+# Expose port
+EXPOSE 8080
+
+# Switch to application user
+USER mcp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health/live || exit 1
+
+# Development command
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+
+# Production stage
+FROM base AS production
+
+# Copy application code
+COPY --chown=mcp:mcp services/ingestion/ /app/services/ingestion/
+COPY --chown=mcp:mcp shared/ /app/shared/
+COPY --chown=mcp:mcp services/ingestion/main.py /app/
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data /app/tmp && \
+    chown -R mcp:mcp /app/logs /app/data /app/tmp
+
+# Set production environment variables
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=production \
+    LOG_LEVEL=INFO \
+    HOST=0.0.0.0 \
+    PORT=8080 \
+    WORKERS=4
+
+# Expose port
+EXPOSE 8080
+
+# Switch to application user
+USER mcp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health/live || exit 1
+
+# Production command
+CMD ["python3", "-m", "gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--max-requests", "1000", "--max-requests-jitter", "50", "--timeout", "30", "--keep-alive", "2", "--log-level", "info", "--access-logfile", "-", "--error-logfile", "-"]
+
+# Testing stage
+FROM base AS testing
+
+# Copy application code
+COPY --chown=mcp:mcp . .
+
+# Set testing environment variables
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=testing \
+    LOG_LEVEL=DEBUG
+
+# Switch to application user
+USER mcp
+
+# Testing command
+CMD ["python3", "run_tests.py", "--full"]
+
+# Build stage for CI/CD
+FROM base AS build
+
+# Install build dependencies
+RUN pip3 install --no-cache-dir \
+    build \
+    wheel \
+    twine
+
+# Copy application code
+COPY --chown=mcp:mcp . .
+
+# Set build environment variables
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Switch to application user
+USER mcp
+
+# Build command
+CMD ["python3", "-m", "build"]
+
+# Security scanning stage
+FROM base AS security-scan
+
+# Install security scanning tools
+RUN pip3 install --no-cache-dir \
+    safety \
+    bandit \
+    semgrep
+
+# Copy application code
+COPY --chown=mcp:mcp . .
+
+# Set security scanning environment variables
+ENV PYTHONPATH=/app
+
+# Switch to application user
+USER mcp
+
+# Security scanning command
+CMD ["sh", "-c", "safety check && bandit -r services/ingestion/ -f json -o /app/bandit-report.json && semgrep --config=auto services/ingestion/"]
+
+# Final production image
+FROM production AS final
+
+# Add build information
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG VERSION
+
+LABEL build.date="${BUILD_DATE}" \
+      build.git.commit="${GIT_COMMIT}" \
+      build.git.branch="${GIT_BRANCH}" \
+      build.version="${VERSION}"
+
+# Create build info file
+RUN echo "Build Date: ${BUILD_DATE}" > /app/build-info.txt && \
+    echo "Git Commit: ${GIT_COMMIT}" >> /app/build-info.txt && \
+    echo "Git Branch: ${GIT_BRANCH}" >> /app/build-info.txt && \
+    echo "Version: ${VERSION}" >> /app/build-info.txt
+
+# Ensure proper permissions
+RUN chmod +x /app/build-info.txt
+
+# Final production command with graceful shutdown
+CMD ["python3", "-c", "import signal, sys; import uvicorn; from main import app; signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0)); uvicorn.run(app, host='0.0.0.0', port=8080, workers=4, log_level='info')"]

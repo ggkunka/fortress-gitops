@@ -1,0 +1,30 @@
+apiVersion: v2
+name: enrichment-service
+description: A Helm chart for MCP Security Platform Enrichment Service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - security
+  - enrichment
+  - threat-intelligence
+  - mitre-attack
+  - vulnerability-analysis
+
+home: https://github.com/example/mcp-security-platform
+sources:
+  - https://github.com/example/mcp-security-platform
+
+maintainers:
+  - name: MCP Security Team
+    email: security@example.com
+
+dependencies:
+  - name: redis
+    version: "18.1.5"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+
+annotations:
+  category: Security
