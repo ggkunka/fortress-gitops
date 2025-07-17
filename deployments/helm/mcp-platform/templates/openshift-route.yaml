@@ -1,0 +1,31 @@
+{{- if and (eq (include "mcp-platform.isOpenShift" .) "true") .Values.kubernetesFlavorConfig.openshift.route.enabled -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "mcp-platform.fullname" . }}
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    {{- if .Values.kubernetesFlavorConfig.openshift.route.tls }}
+    haproxy.router.openshift.io/timeout: "30s"
+    haproxy.router.openshift.io/rate-limit-connections: "true"
+    haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: "100"
+    {{- end }}
+spec:
+  host: {{ .Values.kubernetesFlavorConfig.openshift.route.host }}
+  {{- if .Values.kubernetesFlavorConfig.openshift.route.tls }}
+  tls:
+    termination: {{ .Values.kubernetesFlavorConfig.openshift.route.tls.termination }}
+    {{- if .Values.kubernetesFlavorConfig.openshift.route.tls.insecureEdgeTerminationPolicy }}
+    insecureEdgeTerminationPolicy: {{ .Values.kubernetesFlavorConfig.openshift.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "mcp-platform.fullname" . }}-gateway
+    weight: 100
+  port:
+    targetPort: {{ .Values.services.gateway.service.targetPort }}
+  wildcardPolicy: None
+{{- end }}

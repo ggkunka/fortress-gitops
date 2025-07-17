@@ -1,58 +1,166 @@
 apiVersion: v2
 name: mcp-platform
-description: A Helm chart for MCP Security Assessment Platform
-version: 0.1.0
-appVersion: "0.1.0"
-home: https://github.com/your-org/mcp-security-platform
-maintainers:
-  - name: MCP Security Team
-    email: security@mcp-platform.com
-sources:
-  - https://github.com/your-org/mcp-security-platform
+description: A comprehensive, pluggable security assessment platform for MCP environments with multi-Kubernetes support
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
 keywords:
   - security
-  - vulnerability
-  - scanning
-  - assessment
-  - microservices
-  - mcp
-type: application
-kubeVersion: ">=1.21.0-0 <1.33.0-0"
-deprecated: false
+  - vulnerability-scanning
+  - threat-intelligence
+  - mitre-attack
+  - devsecops
+  - sbom
+  - compliance
+  - event-driven
+
+home: https://github.com/ggkunka/mcp-security-platform
+sources:
+  - https://github.com/ggkunka/mcp-security-platform
+
+maintainers:
+  - name: MCP Security Team
+    email: security@example.com
+
+# Multi-Kubernetes version compatibility (1.21 to 1.32+)
+kubeVersion: ">=1.21.0-0"
+
+dependencies:
+  # Infrastructure dependencies
+  - name: redis
+    version: "18.1.5"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+    tags:
+      - infrastructure
+  
+  - name: postgresql
+    version: "13.2.24"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    tags:
+      - infrastructure
+  
+  # Monitoring stack (optional)
+  - name: prometheus
+    version: "25.8.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: monitoring.prometheus.enabled
+    tags:
+      - monitoring
+  
+  - name: grafana
+    version: "7.0.17"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: monitoring.grafana.enabled
+    tags:
+      - monitoring
+  
+  # MCP Platform microservices (as sub-charts)
+  - name: ingestion-service
+    version: "1.0.0"
+    repository: "file://./charts/ingestion-service"
+    condition: services.ingestion.enabled
+    tags:
+      - microservices
+      - core
+  
+  - name: enrichment-service
+    version: "1.0.0"
+    repository: "file://./charts/enrichment-service"
+    condition: services.enrichment.enabled
+    tags:
+      - microservices
+      - core
+  
+  - name: analysis-service
+    version: "1.0.0"
+    repository: "file://./charts/analysis-service"
+    condition: services.analysis.enabled
+    tags:
+      - microservices
+      - core
+  
+  - name: notification-service
+    version: "1.0.0"
+    repository: "file://./charts/notification-service"
+    condition: services.notification.enabled
+    tags:
+      - microservices
+      - optional
+  
+  - name: auth-service
+    version: "1.0.0"
+    repository: "file://./charts/auth-service"
+    condition: services.auth.enabled
+    tags:
+      - microservices
+      - security
+  
+  - name: gateway-service
+    version: "1.0.0"
+    repository: "file://./charts/gateway-service"
+    condition: services.gateway.enabled
+    tags:
+      - microservices
+      - security
+
 annotations:
   category: Security
-  licenses: MIT
-  images: |
-    - name: auth
-      image: ghcr.io/your-org/mcp-security-platform-auth:0.1.0
-    - name: gateway
-      image: ghcr.io/your-org/mcp-security-platform-gateway:0.1.0
-    - name: scanner-manager
-      image: ghcr.io/your-org/mcp-security-platform-scanner-manager:0.1.0
-    - name: vulnerability-analyzer
-      image: ghcr.io/your-org/mcp-security-platform-vulnerability-analyzer:0.1.0
-    - name: report-generator
-      image: ghcr.io/your-org/mcp-security-platform-report-generator:0.1.0
-    - name: notification
-      image: ghcr.io/your-org/mcp-security-platform-notification:0.1.0
+  licenses: Apache-2.0
+  
+  # Multi-platform support
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/containsSecurityUpdates: "true"
+  
+  # Platform compatibility matrix
+  artifacthub.io/recommendations: |
+    - url: https://kubernetes.io/docs/concepts/overview/
+    - url: https://helm.sh/docs/
+    - url: https://docs.openshift.com/
+    - url: https://docs.aws.amazon.com/eks/
+    - url: https://docs.microsoft.com/en-us/azure/aks/
+  
+  # OpenShift compatibility
+  openshift.io/display-name: "MCP Security Platform"
+  openshift.io/description: "Comprehensive security assessment platform with event-driven architecture"
+  openshift.io/provider-display-name: "MCP Security Team"
+  openshift.io/support-url: "https://github.com/ggkunka/mcp-security-platform"
+  
+  # Container images registry
+  artifacthub.io/images: |
+    - name: ingestion-service
+      image: mcp-security/ingestion-service:1.0.0
+    - name: enrichment-service
+      image: mcp-security/enrichment-service:1.0.0
+    - name: analysis-service
+      image: mcp-security/analysis-service:1.0.0
+    - name: notification-service
+      image: mcp-security/notification-service:1.0.0
+    - name: auth-service
+      image: mcp-security/auth-service:1.0.0
+    - name: gateway-service
+      image: mcp-security/gateway-service:1.0.0
+    - name: redis
+      image: redis:7.2-alpine
     - name: postgresql
       image: postgres:15-alpine
-    - name: redis
-      image: redis:7-alpine
-dependencies:
-  - name: postgresql
-    version: "12.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql.enabled
-  - name: redis
-    version: "18.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: redis.enabled
-  - name: prometheus
-    version: "25.x.x"
-    repository: https://prometheus-community.github.io/helm-charts
-    condition: prometheus.enabled
-  - name: grafana
-    version: "7.x.x"
-    repository: https://grafana.github.io/helm-charts
-    condition: grafana.enabled
+  
+  # Change log
+  artifacthub.io/changes: |
+    - kind: added
+      description: Multi-Kubernetes platform support (1.21-1.32+)
+    - kind: added  
+      description: Event-driven architecture with Redis Pub/Sub
+    - kind: added
+      description: Multi-source threat intelligence integration
+    - kind: added
+      description: MITRE ATT&CK framework mapping
+    - kind: added
+      description: Platform-specific templates (OpenShift, EKS, AKS, GKE)
+    - kind: added
+      description: Comprehensive security hardening and compliance features
+    - kind: added
+      description: Sub-chart architecture for microservices

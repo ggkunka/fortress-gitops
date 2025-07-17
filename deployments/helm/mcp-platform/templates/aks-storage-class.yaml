@@ -1,0 +1,22 @@
+{{- if and (eq (include "mcp-platform.isAKS" .) "true") .Values.kubernetesFlavorConfig.aks.disk.enabled -}}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "mcp-platform.fullname" . }}-azuredisk
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  skuName: {{ .Values.kubernetesFlavorConfig.aks.disk.storageAccount }}
+  kind: Managed
+  fsType: ext4
+  {{- if .Values.kubernetesFlavorConfig.aks.disk.priority }}
+  cachingmode: ReadOnly
+  {{- end }}
+reclaimPolicy: Delete
+{{- end }}

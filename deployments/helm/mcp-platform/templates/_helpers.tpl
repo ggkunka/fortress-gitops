@@ -228,6 +228,31 @@ Check Kubernetes version compatibility
 {{- end }}
 
 {{/*
+Kubernetes version detection and API version helpers
+*/}}
+
+{{/*
+Get major.minor version from Kubernetes version
+*/}}
+{{- define "mcp-platform.kubeVersion" -}}
+{{- regexReplaceAll "^v?([0-9]+\\.[0-9]+).*" .Capabilities.KubeVersion.Version "${1}" }}
+{{- end }}
+
+{{/*
+Check if Kubernetes version supports a specific API
+*/}}
+{{- define "mcp-platform.supportsAPI" -}}
+{{- $kubeVersion := include "mcp-platform.kubeVersion" . }}
+{{- $apiVersion := .apiVersion }}
+{{- $minVersion := .minVersion }}
+{{- if semverCompare (printf ">=%s" $minVersion) $kubeVersion }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
 Create API version for Ingress based on Kubernetes version
 */}}
 {{- define "mcp-platform.ingress.apiVersion" -}}
@@ -237,6 +262,30 @@ Create API version for Ingress based on Kubernetes version
 {{- print "networking.k8s.io/v1beta1" }}
 {{- else }}
 {{- print "extensions/v1beta1" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create pathType for Ingress based on Kubernetes version
+*/}}
+{{- define "mcp-platform.ingress.pathType" -}}
+{{- if semverCompare ">=1.18.0" .Capabilities.KubeVersion.Version }}
+{{- print "Prefix" }}
+{{- else }}
+{{- print "" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create API version for CronJob based on Kubernetes version
+*/}}
+{{- define "mcp-platform.cronjob.apiVersion" -}}
+{{- if semverCompare ">=1.25.0" .Capabilities.KubeVersion.Version }}
+{{- print "batch/v1" }}
+{{- else if semverCompare ">=1.21.0" .Capabilities.KubeVersion.Version }}
+{{- print "batch/v1" }}
+{{- else }}
+{{- print "batch/v1beta1" }}
 {{- end }}
 {{- end }}
 
@@ -322,4 +371,299 @@ Create common pod annotations
 */}}
 {{- define "mcp-platform.podAnnotations" -}}
 checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+{{- if .Values.kubernetesFlavorConfig.eks.enabled }}
+{{- if .Values.kubernetesFlavorConfig.eks.serviceAccount.annotations }}
+{{- range $key, $value := .Values.kubernetesFlavorConfig.eks.serviceAccount.annotations }}
+{{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.kubernetesFlavorConfig.aks.enabled }}
+{{- if .Values.kubernetesFlavorConfig.aks.podAnnotations }}
+{{- range $key, $value := .Values.kubernetesFlavorConfig.aks.podAnnotations }}
+{{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Platform-specific helpers
+*/}}
+
+{{/*
+Detect Kubernetes platform/flavor
+*/}}
+{{- define "mcp-platform.detectPlatform" -}}
+{{- if .Values.kubernetesFlavorConfig.openshift.enabled }}
+{{- print "openshift" }}
+{{- else if .Values.kubernetesFlavorConfig.eks.enabled }}
+{{- print "eks" }}
+{{- else if .Values.kubernetesFlavorConfig.aks.enabled }}
+{{- print "aks" }}
+{{- else if .Values.kubernetesFlavorConfig.gke.enabled }}
+{{- print "gke" }}
+{{- else }}
+{{- print "vanilla" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if running on OpenShift
+*/}}
+{{- define "mcp-platform.isOpenShift" -}}
+{{- if .Values.kubernetesFlavorConfig.openshift.enabled }}
+{{- print "true" }}
+{{- else if .Capabilities.APIVersions.Has "route.openshift.io/v1" }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if running on EKS
+*/}}
+{{- define "mcp-platform.isEKS" -}}
+{{- if .Values.kubernetesFlavorConfig.eks.enabled }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if running on AKS
+*/}}
+{{- define "mcp-platform.isAKS" -}}
+{{- if .Values.kubernetesFlavorConfig.aks.enabled }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if running on GKE
+*/}}
+{{- define "mcp-platform.isGKE" -}}
+{{- if .Values.kubernetesFlavorConfig.gke.enabled }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Security context helpers for different platforms
+*/}}
+
+{{/*
+Create Pod Security Standards policy (K8s 1.25+)
+*/}}
+{{- define "mcp-platform.podSecurityStandards" -}}
+{{- if semverCompare ">=1.25.0" .Capabilities.KubeVersion.Version }}
+{{- if not (eq (include "mcp-platform.isOpenShift" .) "true") }}
+pod-security.kubernetes.io/enforce: {{ .Values.security.podSecurityStandards.enforce | default "restricted" }}
+pod-security.kubernetes.io/audit: {{ .Values.security.podSecurityStandards.audit | default "restricted" }}
+pod-security.kubernetes.io/warn: {{ .Values.security.podSecurityStandards.warn | default "restricted" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create security context based on platform
+*/}}
+{{- define "mcp-platform.platformSecurityContext" -}}
+{{- if eq (include "mcp-platform.isOpenShift" .) "true" }}
+{{/* OpenShift SCCs handle security context automatically */}}
+securityContext: {}
+{{- else }}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+  runAsGroup: {{ .Values.security.runAsGroup | default 1000 }}
+  fsGroup: {{ .Values.security.fsGroup | default 1000 }}
+  seccompProfile:
+    type: RuntimeDefault
+{{- end }}
+{{- end }}
+
+{{/*
+Create container security context based on platform
+*/}}
+{{- define "mcp-platform.platformContainerSecurityContext" -}}
+{{- if eq (include "mcp-platform.isOpenShift" .) "true" }}
+{{/* OpenShift SCCs handle security context automatically */}}
+securityContext: {}
+{{- else }}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: {{ .Values.security.runAsUser | default 1000 }}
+  capabilities:
+    drop:
+    - ALL
+  seccompProfile:
+    type: RuntimeDefault
+{{- end }}
+{{- end }}
+
+{{/*
+Create service account annotations for platform-specific features
+*/}}
+{{- define "mcp-platform.serviceAccountAnnotations" -}}
+{{- if eq (include "mcp-platform.isEKS" .) "true" }}
+{{/* EKS IRSA annotations */}}
+{{- if .Values.kubernetesFlavorConfig.eks.serviceAccount.annotations }}
+{{- range $key, $value := .Values.kubernetesFlavorConfig.eks.serviceAccount.annotations }}
+{{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- else if eq (include "mcp-platform.isAKS" .) "true" }}
+{{/* AKS Managed Identity annotations */}}
+{{- if .Values.kubernetesFlavorConfig.aks.managedIdentity.enabled }}
+azure.workload.identity/client-id: {{ .Values.kubernetesFlavorConfig.aks.managedIdentity.clientId | quote }}
+azure.workload.identity/tenant-id: {{ .Values.kubernetesFlavorConfig.aks.managedIdentity.tenantId | quote }}
+{{- end }}
+{{- else if eq (include "mcp-platform.isGKE" .) "true" }}
+{{/* GKE Workload Identity annotations */}}
+{{- if .Values.kubernetesFlavorConfig.gke.workloadIdentity.enabled }}
+iam.gke.io/gcp-service-account: {{ .Values.kubernetesFlavorConfig.gke.workloadIdentity.serviceAccount | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create network policy based on platform capabilities
+*/}}
+{{- define "mcp-platform.networkPolicyEnabled" -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- if eq (include "mcp-platform.isOpenShift" .) "true" }}
+{{- print "true" }}
+{{- else if .Capabilities.APIVersions.Has "networking.k8s.io/v1/NetworkPolicy" }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create PodSecurityPolicy or Pod Security Standards based on K8s version
+*/}}
+{{- define "mcp-platform.podSecurityPolicy" -}}
+{{- if semverCompare "<1.25.0" .Capabilities.KubeVersion.Version }}
+{{- if .Values.security.podSecurityPolicy.enabled }}
+{{- if .Capabilities.APIVersions.Has "policy/v1beta1/PodSecurityPolicy" }}
+{{- print "true" }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- else }}
+{{- print "false" }}
+{{- end }}
+{{- else }}
+{{/* Use Pod Security Standards for K8s 1.25+ */}}
+{{- print "false" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create storage class annotation based on platform
+*/}}
+{{- define "mcp-platform.storageClassAnnotation" -}}
+{{- $platform := include "mcp-platform.detectPlatform" . }}
+{{- if eq $platform "openshift" }}
+volume.beta.kubernetes.io/storage-class: {{ include "mcp-platform.storageClass" . }}
+{{- else if eq $platform "eks" }}
+{{- if .Values.kubernetesFlavorConfig.eks.ebs.enabled }}
+volume.beta.kubernetes.io/storage-class: {{ include "mcp-platform.storageClass" . }}
+ebs.csi.aws.com/encrypted: "{{ .Values.kubernetesFlavorConfig.eks.ebs.encrypted }}"
+{{- end }}
+{{- else if eq $platform "aks" }}
+{{- if .Values.kubernetesFlavorConfig.aks.disk.enabled }}
+volume.beta.kubernetes.io/storage-class: {{ include "mcp-platform.storageClass" . }}
+kubernetes.azure.com/scalesetpriority: {{ .Values.kubernetesFlavorConfig.aks.disk.priority | default "regular" }}
+{{- end }}
+{{- else if eq $platform "gke" }}
+{{- if .Values.kubernetesFlavorConfig.gke.disk.enabled }}
+volume.beta.kubernetes.io/storage-class: {{ include "mcp-platform.storageClass" . }}
+{{- end }}
+{{- else }}
+volume.beta.kubernetes.io/storage-class: {{ include "mcp-platform.storageClass" . }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create ingress annotations based on platform
+*/}}
+{{- define "mcp-platform.ingressAnnotations" -}}
+{{- $platform := include "mcp-platform.detectPlatform" . }}
+{{- if eq $platform "eks" }}
+{{- if .Values.kubernetesFlavorConfig.eks.alb.enabled }}
+kubernetes.io/ingress.class: alb
+alb.ingress.kubernetes.io/scheme: {{ .Values.kubernetesFlavorConfig.eks.alb.scheme | default "internet-facing" }}
+alb.ingress.kubernetes.io/target-type: {{ .Values.kubernetesFlavorConfig.eks.alb.targetType | default "ip" }}
+{{- if .Values.kubernetesFlavorConfig.eks.alb.certificateArn }}
+alb.ingress.kubernetes.io/certificate-arn: {{ .Values.kubernetesFlavorConfig.eks.alb.certificateArn }}
+alb.ingress.kubernetes.io/ssl-policy: {{ .Values.kubernetesFlavorConfig.eks.alb.sslPolicy | default "ELBSecurityPolicy-TLS-1-2-2017-01" }}
+{{- end }}
+{{- end }}
+{{- else if eq $platform "aks" }}
+{{- if .Values.kubernetesFlavorConfig.aks.appGateway.enabled }}
+kubernetes.io/ingress.class: azure/application-gateway
+appgw.ingress.kubernetes.io/ssl-redirect: "{{ .Values.kubernetesFlavorConfig.aks.appGateway.sslRedirect }}"
+{{- end }}
+{{- else if eq $platform "gke" }}
+{{- if .Values.kubernetesFlavorConfig.gke.gce.enabled }}
+kubernetes.io/ingress.class: gce
+{{- if .Values.kubernetesFlavorConfig.gke.gce.staticIp }}
+kubernetes.io/ingress.global-static-ip-name: {{ .Values.kubernetesFlavorConfig.gke.gce.staticIp }}
+{{- end }}
+{{- end }}
+{{- else }}
+{{- if .Values.ingress.className }}
+kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create resource quotas based on platform
+*/}}
+{{- define "mcp-platform.resourceQuota" -}}
+{{- $platform := include "mcp-platform.detectPlatform" . }}
+{{- if .Values.resourceQuota.enabled }}
+{{- if eq $platform "openshift" }}
+{{- if .Values.kubernetesFlavorConfig.openshift.quotas }}
+{{- toYaml .Values.kubernetesFlavorConfig.openshift.quotas }}
+{{- end }}
+{{- else }}
+{{- if .Values.resourceQuota.hard }}
+{{- toYaml .Values.resourceQuota.hard }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create monitoring annotations based on platform
+*/}}
+{{- define "mcp-platform.monitoringAnnotations" -}}
+{{- if .Values.monitoring.enabled }}
+prometheus.io/scrape: "true"
+prometheus.io/port: "{{ .Values.monitoring.port | default 8080 }}"
+prometheus.io/path: "{{ .Values.monitoring.path | default "/metrics" }}"
+{{- if eq (include "mcp-platform.isOpenShift" .) "true" }}
+{{- if .Values.monitoring.openshift.enabled }}
+{{- range $key, $value := .Values.monitoring.openshift.annotations }}
+{{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}

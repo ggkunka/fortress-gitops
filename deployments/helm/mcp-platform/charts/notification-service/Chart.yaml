@@ -1,0 +1,27 @@
+apiVersion: v2
+name: notification-service
+description: MCP Security Platform Notification Service - Handles alert notifications and escalations
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.21.0-0"
+
+keywords:
+  - mcp
+  - security
+  - notifications
+  - alerts
+  - escalation
+  - microservice
+
+home: https://github.com/mcp-security/platform
+sources:
+  - https://github.com/mcp-security/platform
+
+maintainers:
+  - name: MCP Security Platform Team
+    email: platform@mcp-security.com
+
+annotations:
+  category: Security
+  licenses: Apache-2.0
