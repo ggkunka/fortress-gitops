@@ -1,0 +1,445 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "MCP Security Platform - Data Pipeline",
+    "tags": ["mcp", "data", "pipeline", "ingestion", "enrichment"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": [
+        {
+          "name": "data_type",
+          "type": "query",
+          "query": "label_values(mcp_data_ingestion_total, data_type)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true,
+          "current": {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Data Ingestion Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_data_ingestion_total{data_type=~\"$data_type\"}[5m]))",
+            "legendFormat": "Records/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "ops"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Enrichment Processing Time",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(mcp_data_enrichment_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95 Duration"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 30
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Analysis Jobs Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_analysis_jobs_total{status=\"success\"}[5m])) / sum(rate(mcp_analysis_jobs_total[5m])) * 100",
+            "legendFormat": "Success %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 90
+                },
+                {
+                  "color": "green",
+                  "value": 95
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Notification Delivery Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_notifications_sent_total{status=\"success\"}[5m]))",
+            "legendFormat": "Notifications/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "ops"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "Data Pipeline Flow",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_data_ingestion_total{data_type=~\"$data_type\",status=\"success\"}[5m])) by (data_type)",
+            "legendFormat": "Ingestion - {{data_type}}"
+          },
+          {
+            "expr": "sum(rate(mcp_data_enrichment_duration_seconds_count[5m])) by (enrichment_type)",
+            "legendFormat": "Enrichment - {{enrichment_type}}"
+          },
+          {
+            "expr": "sum(rate(mcp_analysis_jobs_total{status=\"success\"}[5m])) by (analysis_type)",
+            "legendFormat": "Analysis - {{analysis_type}}"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Operations/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 4
+        }
+      },
+      {
+        "id": 6,
+        "title": "Ingestion by Data Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_data_ingestion_total{data_type=~\"$data_type\"}[5m])) by (data_type, status)",
+            "legendFormat": "{{data_type}} - {{status}}"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Records/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        }
+      },
+      {
+        "id": 7,
+        "title": "Enrichment Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(mcp_data_enrichment_duration_seconds_bucket[5m])) by (le, enrichment_type))",
+            "legendFormat": "{{enrichment_type}} P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(mcp_data_enrichment_duration_seconds_bucket[5m])) by (le, enrichment_type))",
+            "legendFormat": "{{enrichment_type}} P95"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Duration (s)",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        }
+      },
+      {
+        "id": 8,
+        "title": "Analysis Job Status",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_analysis_jobs_total[1h])) by (status)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "right"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 20
+        }
+      },
+      {
+        "id": 9,
+        "title": "Notification Delivery by Channel",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_notifications_sent_total[5m])) by (channel, status)",
+            "legendFormat": "{{channel}} - {{status}}"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Notifications/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 20
+        }
+      },
+      {
+        "id": 10,
+        "title": "Data Quality Metrics",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_data_ingestion_total[1h])) by (data_type, source)",
+            "legendFormat": "{{data_type}} - {{source}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "data_type": "Data Type",
+                "source": "Source",
+                "Value": "Records (1h)"
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        }
+      },
+      {
+        "id": 11,
+        "title": "Processing Latency Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_data_enrichment_duration_seconds_bucket[5m])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "heatmap": {
+          "xAxis": {
+            "show": true
+          },
+          "yAxis": {
+            "show": true,
+            "label": "Duration (s)"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        }
+      }
+    ]
+  }
+}

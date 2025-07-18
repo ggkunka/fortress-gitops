@@ -1,0 +1,48 @@
+# Core testing frameworks
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-xdist>=3.3.0
+pytest-cov>=4.1.0
+pytest-timeout>=2.1.0
+pytest-mock>=3.11.0
+
+# HTTP testing
+requests>=2.31.0
+httpx>=0.24.0
+aiohttp>=3.8.0
+websockets>=11.0.0
+
+# Data validation and models
+pydantic>=2.0.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+redis>=4.6.0
+
+# Kubernetes testing
+kubernetes>=27.2.0
+pyyaml>=6.0
+
+# Performance testing
+locust>=2.16.0
+py-spy>=0.3.14
+
+# Security testing
+bandit>=1.7.5
+safety>=2.3.0
+semgrep>=1.35.0
+
+# Contract testing
+pact-python>=1.7.0
+
+# Chaos engineering
+chaostoolkit>=1.17.0
+chaostoolkit-kubernetes>=0.26.0
+
+# Monitoring and metrics
+prometheus-client>=0.17.0
+
+# Utilities
+faker>=19.3.0
+factory-boy>=3.3.0
+freezegun>=1.2.0
+responses>=0.23.0

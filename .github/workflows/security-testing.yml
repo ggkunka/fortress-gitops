@@ -1,0 +1,526 @@
+name: Security Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml] safety semgrep
+
+    - name: Run Bandit security linter
+      run: |
+        bandit -r services/ shared/ -f json -o bandit-report.json
+        bandit -r services/ shared/ -f sarif -o bandit-results.sarif
+      continue-on-error: true
+
+    - name: Run Safety dependency scanner
+      run: |
+        safety check --json --output safety-report.json
+        safety check --output safety-report.txt
+      continue-on-error: true
+
+    - name: Run Semgrep
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json services/ shared/
+        semgrep --config=auto --sarif --output=semgrep-results.sarif services/ shared/
+      continue-on-error: true
+
+    - name: Upload Bandit SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: bandit-results.sarif
+
+    - name: Upload Semgrep SARIF results  
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: semgrep-results.sarif
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+          safety-report.txt
+          semgrep-report.json
+
+  container-scanning:
+    name: Container Security Scanning
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    if: always()
+    
+    strategy:
+      matrix:
+        service: [gateway, auth, ingestion, enrichment, analysis, notification, plugin-registry]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download built images
+      uses: actions/download-artifact@v3
+      with:
+        name: container-images-${{ matrix.service }}
+        path: /tmp/images/
+
+    - name: Load Docker image
+      run: |
+        docker load -i /tmp/images/${{ matrix.service }}.tar
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'mcp-platform/${{ matrix.service }}:${{ github.sha }}'
+        format: 'sarif'
+        output: 'trivy-${{ matrix.service }}.sarif'
+
+    - name: Run Trivy JSON report
+      uses: aquasecurity/trivy-action@master  
+      with:
+        image-ref: 'mcp-platform/${{ matrix.service }}:${{ github.sha }}'
+        format: 'json'
+        output: 'trivy-${{ matrix.service }}.json'
+
+    - name: Upload Trivy SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-${{ matrix.service }}.sarif'
+
+    - name: Upload Trivy reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trivy-reports
+        path: |
+          trivy-${{ matrix.service }}.json
+          trivy-${{ matrix.service }}.sarif
+
+  kubernetes-security:
+    name: Kubernetes Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run kube-score
+      run: |
+        wget https://github.com/zegl/kube-score/releases/download/v1.16.1/kube-score_1.16.1_linux_amd64.tar.gz
+        tar xzf kube-score_1.16.1_linux_amd64.tar.gz
+        ./kube-score score deployments/helm/mcp-platform/templates/*.yaml \
+          --output-format json > kube-score-report.json
+      continue-on-error: true
+
+    - name: Run Polaris
+      run: |
+        wget https://github.com/FairwindsOps/polaris/releases/download/8.5.1/polaris_linux_amd64.tar.gz
+        tar xzf polaris_linux_amd64.tar.gz
+        ./polaris audit --format json \
+          --audit-path deployments/helm/mcp-platform/templates/ \
+          > polaris-report.json
+      continue-on-error: true
+
+    - name: Run Falco rules validation
+      run: |
+        docker run --rm -v $(pwd):/workspace \
+          falcosecurity/falco:latest \
+          falco --validate /workspace/security/falco-rules.yaml
+      continue-on-error: true
+
+    - name: Upload Kubernetes security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: k8s-security-reports
+        path: |
+          kube-score-report.json
+          polaris-report.json
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run GitLeaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+    - name: Run TruffleHog
+      run: |
+        docker run --rm -v $(pwd):/pwd \
+          trufflesecurity/trufflehog:latest \
+          filesystem /pwd \
+          --json > trufflehog-report.json
+      continue-on-error: true
+
+    - name: Upload secret scanning reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: secret-scanning-reports
+        path: |
+          trufflehog-report.json
+
+  web-security-testing:
+    name: Web Application Security Testing
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: always()
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: mcp_test
+          POSTGRES_USER: mcp_user
+          POSTGRES_PASSWORD: mcp_test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Start MCP services
+      run: |
+        cd tests
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 60  # Wait for services to start
+
+    - name: Run OWASP ZAP baseline scan
+      run: |
+        docker run --rm --network tests_default \
+          -v $(pwd):/zap/wrk/:rw \
+          owasp/zap2docker-stable:latest \
+          zap-baseline.py \
+          -t http://gateway-service:8081 \
+          -J zap-report.json \
+          -r zap-report.html
+      continue-on-error: true
+
+    - name: Run Nikto web scanner
+      run: |
+        docker run --rm --network tests_default \
+          -v $(pwd):/tmp \
+          sullo/nikto:latest \
+          -h http://gateway-service:8081 \
+          -Format json \
+          -output /tmp/nikto-report.json
+      continue-on-error: true
+
+    - name: Stop services
+      if: always()
+      run: |
+        cd tests
+        docker-compose -f docker-compose.test.yml down
+
+    - name: Upload web security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: web-security-reports
+        path: |
+          zap-report.json
+          zap-report.html
+          nikto-report.json
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety pip-audit
+
+    - name: Generate requirements
+      run: |
+        find . -name "requirements*.txt" -exec cat {} \; > all-requirements.txt
+        find . -name "pyproject.toml" -exec echo "# {}" \; -exec cat {} \; >> all-requirements.txt
+
+    - name: Run Safety check
+      run: |
+        safety check --json --output safety-detailed.json
+        safety check --output safety-detailed.txt
+      continue-on-error: true
+
+    - name: Run pip-audit
+      run: |
+        pip-audit --format=json --output=pip-audit-report.json
+        pip-audit --format=cyclonedx-json --output=pip-audit-sbom.json
+      continue-on-error: true
+
+    - name: Upload dependency reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-reports
+        path: |
+          safety-detailed.json
+          safety-detailed.txt
+          pip-audit-report.json
+          pip-audit-sbom.json
+
+  security-scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Run analysis
+      uses: ossf/scorecard-action@v2.3.1
+      with:
+        results_file: scorecard-results.sarif
+        results_format: sarif
+        publish_results: true
+
+    - name: Upload SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: scorecard-results.sarif
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [
+      static-analysis,
+      container-scanning, 
+      kubernetes-security,
+      secret-scanning,
+      web-security-testing,
+      dependency-check
+    ]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all security reports
+      uses: actions/download-artifact@v3
+      with:
+        path: security-reports/
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Generate security summary
+      run: |
+        python tests/scripts/generate_security_summary.py \
+          --reports-dir security-reports/ \
+          --output security-summary.json \
+          --format json
+
+    - name: Create security summary comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('security-summary.json', 'utf8'));
+          
+          const comment = `## 🔒 Security Scan Results
+          
+          | Scan Type | Status | Findings |
+          |-----------|---------|----------|
+          | Static Analysis | ${summary.static_analysis.status} | ${summary.static_analysis.findings} |
+          | Container Scanning | ${summary.container_scanning.status} | ${summary.container_scanning.findings} |
+          | Dependency Check | ${summary.dependency_check.status} | ${summary.dependency_check.findings} |
+          | Web Security | ${summary.web_security.status} | ${summary.web_security.findings} |
+          | Secrets | ${summary.secret_scanning.status} | ${summary.secret_scanning.findings} |
+          
+          **Overall Risk Level:** ${summary.overall_risk_level}
+          
+          ${summary.recommendations ? '### Recommendations\n' + summary.recommendations.map(r => `- ${r}`).join('\n') : ''}
+          
+          <details>
+          <summary>View detailed findings</summary>
+          
+          \`\`\`json
+          ${JSON.stringify(summary, null, 2)}
+          \`\`\`
+          </details>`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Upload security summary
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-summary
+        path: |
+          security-summary.json
+          security-reports/
+
+    - name: Fail on high-risk findings
+      run: |
+        python -c "
+        import json
+        import sys
+        
+        with open('security-summary.json') as f:
+            summary = json.load(f)
+        
+        risk_level = summary.get('overall_risk_level', 'UNKNOWN')
+        critical_count = summary.get('critical_findings', 0)
+        high_count = summary.get('high_findings', 0)
+        
+        if risk_level == 'CRITICAL' or critical_count > 0:
+            print(f'❌ Critical security issues found: {critical_count}')
+            sys.exit(1)
+        elif risk_level == 'HIGH' or high_count > 5:
+            print(f'⚠️  High security issues found: {high_count}')
+            sys.exit(1)
+        else:
+            print(f'✅ Security scan passed. Risk level: {risk_level}')
+            sys.exit(0)
+        "
+
+  build-images:
+    name: Build Container Images  
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [gateway, auth, ingestion, enrichment, analysis, notification, plugin-registry]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/${{ matrix.service }}
+        push: false
+        tags: mcp-platform/${{ matrix.service }}:${{ github.sha }}
+        outputs: type=docker,dest=/tmp/${{ matrix.service }}.tar
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Upload image artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: container-images-${{ matrix.service }}
+        path: /tmp/${{ matrix.service }}.tar
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all built images
+      uses: actions/download-artifact@v3
+      with:
+        pattern: container-images-*
+        path: /tmp/images/
+
+    - name: Load Docker images
+      run: |
+        for service in gateway auth ingestion enrichment analysis notification plugin-registry; do
+          if [ -f "/tmp/images/container-images-${service}/${service}.tar" ]; then
+            docker load -i "/tmp/images/container-images-${service}/${service}.tar"
+          fi
+        done
+
+    - name: Start test environment
+      run: |
+        cd tests
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 60  # Wait for services to be ready
+
+    - name: Run integration tests
+      run: |
+        cd tests
+        docker-compose -f docker-compose.test.yml exec -T test-runner \
+          python -m pytest integration/ -v --junitxml=/app/results/integration-results.xml
+
+    - name: Stop test environment
+      if: always()
+      run: |
+        cd tests
+        docker-compose -f docker-compose.test.yml down

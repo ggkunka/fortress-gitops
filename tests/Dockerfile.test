@@ -1,0 +1,61 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    postgresql-client \
+    redis-tools \
+    jq \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install test dependencies
+COPY requirements.test.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.test.txt
+
+# Install plugin SDK for testing
+COPY ../plugin-sdk /opt/plugin-sdk
+RUN cd /opt/plugin-sdk && pip install -e .[dev]
+
+# Install testing tools
+RUN pip install \
+    pytest \
+    pytest-asyncio \
+    pytest-xdist \
+    pytest-cov \
+    requests \
+    httpx \
+    aiohttp \
+    websockets \
+    pydantic \
+    sqlalchemy \
+    psycopg2-binary \
+    redis \
+    kubernetes \
+    locust \
+    chaos-engineering-toolkit \
+    pact-python
+
+# Create test directories
+RUN mkdir -p /app/tests /app/platform /app/results
+
+# Set working directory
+WORKDIR /app/tests
+
+# Copy test scripts
+COPY . /app/tests/
+
+# Make scripts executable
+RUN chmod +x /app/tests/scripts/*.sh
+
+# Set environment variables
+ENV PYTHONPATH=/app/tests:/app/platform
+ENV PYTEST_TIMEOUT=300
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Default command
+CMD ["tail", "-f", "/dev/null"]
