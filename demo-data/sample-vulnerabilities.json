@@ -1,0 +1,42 @@
+[
+  {
+    "cve_id": "CVE-2021-44228",
+    "severity": "CRITICAL",
+    "cvss_score": 10.0,
+    "description": "Log4Shell - Remote Code Execution vulnerability in Apache Log4j2",
+    "affected_components": ["express@4.17.1", "log4j-core@2.14.1"],
+    "remediation": "Upgrade to Log4j 2.17.0 or set log4j2.formatMsgNoLookups=true",
+    "exploit_available": true,
+    "exploit_in_wild": true
+  },
+  {
+    "cve_id": "CVE-2021-23337",
+    "severity": "HIGH",
+    "cvss_score": 7.2,
+    "description": "Command Injection vulnerability in Lodash template function",
+    "affected_components": ["lodash@4.17.15"],
+    "remediation": "Upgrade to lodash 4.17.21 or later",
+    "exploit_available": true,
+    "exploit_in_wild": false
+  },
+  {
+    "cve_id": "CVE-2021-3807",
+    "severity": "CRITICAL",
+    "cvss_score": 9.1,
+    "description": "Server-Side Request Forgery (SSRF) vulnerability in axios",
+    "affected_components": ["axios@0.21.0"],
+    "remediation": "Upgrade to axios 0.21.2 or later",
+    "exploit_available": true,
+    "exploit_in_wild": false
+  },
+  {
+    "cve_id": "CVE-2021-23017",
+    "severity": "HIGH",
+    "cvss_score": 7.7,
+    "description": "1-byte memory overwrite in nginx resolver",
+    "affected_components": ["nginx@1.20.1"],
+    "remediation": "Upgrade to nginx 1.20.2 or later",
+    "exploit_available": false,
+    "exploit_in_wild": false
+  }
+]

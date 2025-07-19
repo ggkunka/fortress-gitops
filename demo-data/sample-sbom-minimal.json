@@ -1,0 +1,49 @@
+{
+  "bom_format": "CycloneDX",
+  "spec_version": "1.5",
+  "serial_number": "urn:uuid:minimal-demo-12345",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "tools": [
+      {
+        "vendor": "MCP Security",
+        "name": "Demo SBOM Generator",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "pkg:npm/express@4.17.1",
+      "type": "library",
+      "name": "express",
+      "version": "4.17.1",
+      "purl": "pkg:npm/express@4.17.1",
+      "licenses": ["MIT"]
+    },
+    {
+      "id": "pkg:npm/lodash@4.17.15",
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.15",
+      "purl": "pkg:npm/lodash@4.17.15",
+      "licenses": ["MIT"]
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "id": "CVE-2021-44228",
+      "source": "NVD",
+      "ratings": [
+        {
+          "score": 10.0,
+          "severity": "critical",
+          "method": "CVSSv3"
+        }
+      ],
+      "description": "Apache Log4j2 JNDI features do not protect against attacker controlled LDAP endpoints.",
+      "affects": ["pkg:npm/express@4.17.1"]
+    }
+  ]
+}
