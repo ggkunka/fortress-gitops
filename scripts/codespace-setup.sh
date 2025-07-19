@@ -150,7 +150,12 @@ EOF
         # Create build context
         mkdir -p "/tmp/build-${service}"
         cp "/tmp/Dockerfile.${service}" "/tmp/build-${service}/Dockerfile"
-        cp "/tmp/enterprise-requirements.txt" "/tmp/build-${service}/requirements.txt" 2>/dev/null || echo "fastapi==0.104.1\nuvicorn[standard]==0.24.0" > "/tmp/build-${service}/requirements.txt"
+        cp "/tmp/enterprise-requirements.txt" "/tmp/build-${service}/requirements.txt" 2>/dev/null || cat > "/tmp/build-${service}/requirements.txt" <<EOF
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+httpx==0.25.2
+structlog==23.2.0
+EOF
         cp "/tmp/enterprise-main.py" "/tmp/build-${service}/main.py" 2>/dev/null || cat > "/tmp/build-${service}/main.py" <<EOF
 import uvicorn
 from fastapi import FastAPI
