@@ -126,6 +126,71 @@ helm install mcp-security-platform ./deployments/helm/mcp-platform \
   --create-namespace
 ```
 
+## Container Images
+
+The platform uses container images hosted on GitHub Container Registry (ghcr.io). Images are automatically built and pushed via CI/CD pipeline.
+
+### Available Images
+
+All images follow the naming convention: `ghcr.io/[your-username]/mcp-[service-name]:[tag]`
+
+#### Core Services
+- `ghcr.io/ggkunka/mcp-correlation-engine:latest`
+- `ghcr.io/ggkunka/mcp-risk-assessment:latest`
+- `ghcr.io/ggkunka/mcp-response-orchestrator:latest`
+- `ghcr.io/ggkunka/mcp-reporting-service:latest`
+
+#### API Services
+- `ghcr.io/ggkunka/mcp-graphql-server:latest`
+- `ghcr.io/ggkunka/mcp-websocket-server:latest`
+- `ghcr.io/ggkunka/mcp-grpc-server:latest`
+
+#### Scanner Plugins
+- `ghcr.io/ggkunka/mcp-trivy-plugin:latest`
+- `ghcr.io/ggkunka/mcp-syft-plugin:latest`
+- `ghcr.io/ggkunka/mcp-grype-plugin:latest`
+
+#### Integration Plugins
+- `ghcr.io/ggkunka/mcp-github-plugin:latest`
+- `ghcr.io/ggkunka/mcp-slack-plugin:latest`
+
+### Pulling Images Locally
+
+To pull images for local development or testing:
+
+```bash
+# Pull a specific service image
+docker pull ghcr.io/ggkunka/mcp-correlation-engine:latest
+
+# Pull all images (using a script)
+./scripts/pull-images.sh
+
+# Or manually pull all core services
+docker pull ghcr.io/ggkunka/mcp-correlation-engine:latest
+docker pull ghcr.io/ggkunka/mcp-risk-assessment:latest
+docker pull ghcr.io/ggkunka/mcp-response-orchestrator:latest
+docker pull ghcr.io/ggkunka/mcp-reporting-service:latest
+```
+
+### Authentication for Private Registry
+
+If your images are private, authenticate with GitHub Container Registry:
+
+```bash
+# Login using Personal Access Token
+echo $GITHUB_TOKEN | docker login ghcr.io -u [your-username] --password-stdin
+
+# Or using GitHub CLI
+gh auth token | docker login ghcr.io -u [your-username] --password-stdin
+```
+
+### Image Tags
+
+- `latest`: Latest stable release from main branch
+- `develop`: Latest development build from develop branch
+- `[commit-sha]`: Specific commit builds
+- `v[semver]`: Tagged releases (e.g., v1.0.0)
+
 ## API Documentation
 
 Once deployed, access the API documentation at:

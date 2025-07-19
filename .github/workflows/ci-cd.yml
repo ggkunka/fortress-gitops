@@ -1,0 +1,608 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/mcp
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-asyncio
+        find . -name "requirements.txt" -exec pip install -r {} \;
+
+    - name: Run unit tests
+      run: |
+        pytest --cov=. --cov-report=xml --cov-report=html -v
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Bandit security linter
+      run: |
+        pip install bandit[toml]
+        bandit -r . -f json -o bandit-report.json || true
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          trivy-results.sarif
+          bandit-report.json
+
+  build-images:
+    name: Build and Push Container Images
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name != 'pull_request'
+    
+    strategy:
+      matrix:
+        service:
+          - name: correlation-engine
+            context: services/core/correlation
+            dockerfile: services/core/correlation/Dockerfile
+          - name: risk-assessment
+            context: services/core/risk_assessment
+            dockerfile: services/core/risk_assessment/Dockerfile
+          - name: response-orchestrator
+            context: services/core/response
+            dockerfile: services/core/response/Dockerfile
+          - name: reporting-service
+            context: services/core/reporting
+            dockerfile: services/core/reporting/Dockerfile
+          - name: mongodb-service
+            context: services/mongodb-service
+            dockerfile: services/mongodb-service/Dockerfile
+          - name: influxdb-service
+            context: services/influxdb-service
+            dockerfile: services/influxdb-service/Dockerfile
+          - name: plugin-registry
+            context: shared/plugins
+            dockerfile: shared/plugins/Dockerfile
+          - name: trivy-plugin
+            context: plugins/scanners/trivy
+            dockerfile: plugins/scanners/trivy/Dockerfile
+          - name: syft-plugin
+            context: plugins/scanners/syft
+            dockerfile: plugins/scanners/syft/Dockerfile
+          - name: grype-plugin
+            context: plugins/scanners/grype
+            dockerfile: plugins/scanners/grype/Dockerfile
+          - name: github-plugin
+            context: plugins/integrations/github
+            dockerfile: plugins/integrations/github/Dockerfile
+          - name: slack-plugin
+            context: plugins/integrations/slack
+            dockerfile: plugins/integrations/slack/Dockerfile
+          - name: graphql-server
+            context: services/api
+            dockerfile: services/api/Dockerfile.graphql
+          - name: websocket-server
+            context: services/api
+            dockerfile: services/api/Dockerfile.websocket
+          - name: grpc-server
+            context: services/api
+            dockerfile: services/api/Dockerfile.grpc
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Buildah
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y buildah
+
+    - name: Log in to GitHub Container Registry
+      run: |
+        echo "${{ secrets.GITHUB_TOKEN }}" | buildah login --username ${{ github.actor }} --password-stdin ${{ env.REGISTRY }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Create Dockerfile if not exists
+      run: |
+        if [ ! -f "${{ matrix.service.dockerfile }}" ]; then
+          mkdir -p $(dirname "${{ matrix.service.dockerfile }}")
+          cat > "${{ matrix.service.dockerfile }}" << 'EOF'
+        # Multi-stage build for Python service
+        FROM python:3.11-slim as builder
+
+        # Install build dependencies
+        RUN apt-get update && apt-get install -y \
+            gcc \
+            g++ \
+            curl \
+            && rm -rf /var/lib/apt/lists/*
+
+        # Create virtual environment
+        RUN python -m venv /opt/venv
+        ENV PATH="/opt/venv/bin:$PATH"
+
+        # Copy requirements and install dependencies
+        COPY requirements.txt* ./
+        RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+        # Production stage
+        FROM python:3.11-slim
+
+        # Install runtime dependencies
+        RUN apt-get update && apt-get install -y \
+            curl \
+            && rm -rf /var/lib/apt/lists/* \
+            && groupadd -r appuser && useradd -r -g appuser appuser
+
+        # Copy virtual environment from builder
+        COPY --from=builder /opt/venv /opt/venv
+        ENV PATH="/opt/venv/bin:$PATH"
+
+        # Set working directory
+        WORKDIR /app
+
+        # Copy application code
+        COPY . .
+
+        # Set ownership and permissions
+        RUN chown -R appuser:appuser /app
+        USER appuser
+
+        # Health check
+        HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+            CMD curl -f http://localhost:8080/health || exit 1
+
+        # Expose port
+        EXPOSE 8080
+
+        # Default command
+        CMD ["python", "main.py"]
+        EOF
+        fi
+
+    - name: Build container image with Buildah
+      run: |
+        # Create build context
+        cd "${{ matrix.service.context }}"
+        
+        # Build image with Buildah
+        buildah build \
+          --format docker \
+          --file "${{ github.workspace }}/${{ matrix.service.dockerfile }}" \
+          --tag "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.sha }}" \
+          --tag "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.ref_name }}" \
+          .
+        
+        # Add latest tag for main branch
+        if [ "${{ github.ref_name }}" = "main" ]; then
+          buildah tag "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.sha }}" \
+                     "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:latest"
+        fi
+
+    - name: Run container security scan
+      run: |
+        # Install Trivy
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+        
+        # Scan image for vulnerabilities
+        trivy image \
+          --format sarif \
+          --output trivy-image-${{ matrix.service.name }}.sarif \
+          "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.sha }}"
+
+    - name: Push images to registry
+      run: |
+        # Push SHA tag
+        buildah push "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.sha }}"
+        
+        # Push branch tag
+        buildah push "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:${{ github.ref_name }}"
+        
+        # Push latest tag for main branch
+        if [ "${{ github.ref_name }}" = "main" ]; then
+          buildah push "ghcr.io/${{ github.repository_owner }}/mcp-${{ matrix.service.name }}:latest"
+        fi
+
+    - name: Upload container scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: container-security-scans
+        path: trivy-image-*.sarif
+
+  build-helm-charts:
+    name: Build and Package Helm Charts
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.event_name != 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.12.0'
+
+    - name: Create Helm charts directory
+      run: |
+        mkdir -p helm-charts/mcp-platform
+
+    - name: Generate Helm Chart
+      run: |
+        cat > helm-charts/mcp-platform/Chart.yaml << EOF
+        apiVersion: v2
+        name: mcp-platform
+        description: MCP Security Platform Helm Chart
+        type: application
+        version: 1.0.0
+        appVersion: ${{ github.sha }}
+        maintainers:
+        - name: MCP Security Platform Team
+          email: security@mcp-platform.local
+        keywords:
+        - security
+        - vulnerability-management
+        - compliance
+        - sbom
+        home: https://github.com/${{ github.repository }}
+        sources:
+        - https://github.com/${{ github.repository }}
+        EOF
+
+    - name: Generate values.yaml
+      run: |
+        cat > helm-charts/mcp-platform/values.yaml << 'EOF'
+        # Global configuration
+        global:
+          registry: ghcr.io/${{ github.repository_owner }}
+          imageTag: ${{ github.sha }}
+          imagePullPolicy: IfNotPresent
+          namespace: mcp-security-platform
+
+        # Core Services Configuration
+        correlationEngine:
+          enabled: true
+          replicaCount: 3
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/mcp-correlation-engine
+            tag: ${{ github.sha }}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          autoscaling:
+            enabled: true
+            minReplicas: 3
+            maxReplicas: 10
+            targetCPUUtilizationPercentage: 70
+
+        riskAssessment:
+          enabled: true
+          replicaCount: 3
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/mcp-risk-assessment
+            tag: ${{ github.sha }}
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+          autoscaling:
+            enabled: true
+            minReplicas: 3
+            maxReplicas: 8
+            targetCPUUtilizationPercentage: 70
+
+        responseOrchestrator:
+          enabled: true
+          replicaCount: 2
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/mcp-response-orchestrator
+            tag: ${{ github.sha }}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+
+        reportingService:
+          enabled: true
+          replicaCount: 2
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/mcp-reporting-service
+            tag: ${{ github.sha }}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+
+        # Plugin System Configuration
+        pluginRegistry:
+          enabled: true
+          replicaCount: 3
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/mcp-plugin-registry
+            tag: ${{ github.sha }}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+
+        # Scanner Plugins
+        plugins:
+          trivy:
+            enabled: true
+            replicaCount: 3
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-trivy-plugin
+              tag: ${{ github.sha }}
+          
+          syft:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-syft-plugin
+              tag: ${{ github.sha }}
+
+          grype:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-grype-plugin
+              tag: ${{ github.sha }}
+
+          github:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-github-plugin
+              tag: ${{ github.sha }}
+
+          slack:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-slack-plugin
+              tag: ${{ github.sha }}
+
+        # API Services
+        api:
+          graphql:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-graphql-server
+              tag: ${{ github.sha }}
+          
+          websocket:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-websocket-server
+              tag: ${{ github.sha }}
+          
+          grpc:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-grpc-server
+              tag: ${{ github.sha }}
+
+        # Data Services
+        dataServices:
+          mongodb:
+            enabled: true
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-mongodb-service
+              tag: ${{ github.sha }}
+          
+          influxdb:
+            enabled: true
+            image:
+              repository: ghcr.io/${{ github.repository_owner }}/mcp-influxdb-service
+              tag: ${{ github.sha }}
+
+        # Security Configuration
+        security:
+          podSecurityPolicy:
+            enabled: true
+          networkPolicies:
+            enabled: true
+          serviceAccount:
+            create: true
+            name: mcp-service-account
+
+        # Ingress Configuration
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          hosts:
+          - host: api.mcp-security-platform.local
+            paths:
+            - path: /
+              pathType: Prefix
+          tls:
+          - secretName: mcp-platform-tls
+            hosts:
+            - api.mcp-security-platform.local
+
+        # Monitoring Configuration
+        monitoring:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+            interval: 30s
+          prometheusRule:
+            enabled: true
+
+        # Storage Configuration
+        persistence:
+          enabled: true
+          storageClass: ssd-storage
+          size: 100Gi
+        EOF
+
+    - name: Lint Helm chart
+      run: |
+        helm lint helm-charts/mcp-platform/
+
+    - name: Package Helm chart
+      run: |
+        helm package helm-charts/mcp-platform/ --destination ./
+
+    - name: Upload Helm chart artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: helm-charts
+        path: |
+          *.tgz
+          helm-charts/
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images, build-helm-charts]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Image tags: ${{ github.sha }}"
+        # Add actual deployment commands here
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images, build-helm-charts]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        echo "Image tags: ${{ github.sha }}"
+        # Add actual deployment commands here
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, build-images]
+    if: github.event_name == 'release'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create release assets
+      run: |
+        # Create deployment manifests archive
+        tar -czf mcp-platform-manifests-${{ github.event.release.tag_name }}.tar.gz deployments/
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./mcp-platform-manifests-${{ github.event.release.tag_name }}.tar.gz
+        asset_name: mcp-platform-manifests-${{ github.event.release.tag_name }}.tar.gz
+        asset_content_type: application/gzip

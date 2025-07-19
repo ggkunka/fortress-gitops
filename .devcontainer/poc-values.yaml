@@ -1,0 +1,267 @@
+# MCP Security Platform POC Values
+# Optimized for GitHub Codespaces and Kind cluster
+
+# Global configuration for POC
+global:
+  imageRegistry: "ghcr.io"
+  imageNamespace: "ggkunka"
+  imagePullSecrets: []
+  storageClass: "standard"
+
+# Use Kind-specific node selectors
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+# Minimal resource requests for POC
+defaultResources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+
+# Service configuration for POC
+services:
+  # Gateway Service
+  gateway:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-gateway-service"
+      tag: "latest"
+    service:
+      type: NodePort
+      port: 8000
+      nodePort: 30000
+    resources: 
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Authentication Service  
+  auth:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-auth-service"
+      tag: "latest"
+    service:
+      type: NodePort
+      port: 8001
+      nodePort: 30001
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Correlation Engine
+  correlationEngine:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-correlation-engine"
+      tag: "latest"
+    service:
+      type: NodePort
+      port: 8080
+      nodePort: 30002
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Risk Assessment Service
+  riskAssessment:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-risk-assessment"
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Response Orchestrator
+  responseOrchestrator:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-response-orchestrator"
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Reporting Service
+  reportingService:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-reporting-service"
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Plugin System Configuration (minimal for POC)
+plugins:
+  trivy:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-trivy-plugin"
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  syft:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-syft-plugin"
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Disable resource-intensive features for POC
+dataServices:
+  mongodb:
+    enabled: false
+  influxdb:
+    enabled: false
+
+# Use external services (from docker-compose)
+externalServices:
+  postgresql:
+    enabled: true
+    host: "host.docker.internal"
+    port: 5432
+    database: "mcp_security"
+    username: "mcp_user"
+    password: "mcp_password"
+  
+  redis:
+    enabled: true
+    host: "host.docker.internal"
+    port: 6379
+    password: "redis_password"
+
+# Minimal PostgreSQL for demo data
+postgresql:
+  enabled: false  # Use external PostgreSQL from docker-compose
+
+# Minimal Redis configuration  
+redis:
+  enabled: false  # Use external Redis from docker-compose
+
+# Security configuration (relaxed for POC)
+security:
+  podSecurityPolicy:
+    enabled: false
+  networkPolicies:
+    enabled: false
+  serviceAccount:
+    create: true
+    name: mcp-poc-service-account
+
+# Ingress configuration for POC
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: mcp-poc.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: mcp-platform-gateway
+            port: 8000
+        - path: /auth
+          pathType: Prefix
+          service:
+            name: mcp-platform-auth
+            port: 8001
+
+# Monitoring (minimal for POC)
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+
+# Resource quotas (disabled for POC)
+resourceQuota:
+  enabled: false
+
+# Pod disruption budgets (disabled for POC)
+podDisruptionBudget:
+  enabled: false
+
+# Autoscaling (disabled for POC)
+autoscaling:
+  enabled: false
+
+# Persistence (minimal for POC)
+persistence:
+  enabled: false
+
+# Backup (disabled for POC)
+backup:
+  enabled: false
+
+# Migration job
+migration:
+  enabled: true
+  image:
+    repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-auth-service"
+    tag: "latest"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Environment variables for POC
+env:
+  DATABASE_URL: "postgresql://mcp_user:mcp_password@host.docker.internal:5432/mcp_security"
+  REDIS_URL: "redis://:redis_password@host.docker.internal:6379/0"
+  MCP_ENV: "development"
+  MCP_LOG_LEVEL: "debug"
+  API_RATE_LIMIT: "1000/minute"
