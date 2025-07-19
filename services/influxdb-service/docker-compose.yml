@@ -1,0 +1,182 @@
+# InfluxDB Service Docker Compose
+
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: mcp-influxdb
+    restart: unless-stopped
+    ports:
+      - "${INFLUXDB_PORT:-8086}:8086"
+    environment:
+      # Initial setup
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-mcp_security}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-mcp_security_metrics}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-your-super-secret-auth-token}
+      
+      # Configuration
+      INFLUXDB_HTTP_BIND_ADDRESS: ":8086"
+      INFLUXDB_REPORTING_DISABLED: "true"
+      
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+      - ./influxdb-init:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  chronograf:
+    image: chronograf:1.10
+    container_name: mcp-chronograf
+    restart: unless-stopped
+    ports:
+      - "${CHRONOGRAF_PORT:-8888}:8888"
+    environment:
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_USERNAME: ${INFLUXDB_USERNAME:-admin}
+      INFLUXDB_PASSWORD: ${INFLUXDB_PASSWORD:-admin123}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - mcp-network
+
+  influxdb-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-influxdb-service
+    restart: unless-stopped
+    ports:
+      - "${INFLUXDB_SERVICE_PORT:-8011}:8011"
+    environment:
+      # InfluxDB configuration
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-your-super-secret-auth-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-mcp_security}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-mcp_security_metrics}
+      
+      # Redis configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Service configuration
+      SERVICE_NAME: influxdb-service
+      SERVICE_VERSION: 1.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Observability
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_ENDPOINT:-http://jaeger:14268/api/traces}
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-change-in-production}
+      
+      # Processing configuration
+      METRICS_BATCH_SIZE: ${METRICS_BATCH_SIZE:-1000}
+      METRICS_FLUSH_INTERVAL: ${METRICS_FLUSH_INTERVAL:-10}
+      ANOMALY_DETECTION_ENABLED: ${ANOMALY_DETECTION_ENABLED:-true}
+      ALERTING_ENABLED: ${ALERTING_ENABLED:-true}
+      
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: mcp-redis-metrics
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  telegraf:
+    image: telegraf:1.28
+    container_name: mcp-telegraf
+    restart: unless-stopped
+    environment:
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-your-super-secret-auth-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-mcp_security}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-mcp_security_metrics}
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc:/host/etc:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    privileged: true
+
+  kapacitor:
+    image: kapacitor:1.6
+    container_name: mcp-kapacitor
+    restart: unless-stopped
+    ports:
+      - "${KAPACITOR_PORT:-9092}:9092"
+    environment:
+      KAPACITOR_HOSTNAME: kapacitor
+      KAPACITOR_INFLUXDB_0_URLS_0: http://influxdb:8086
+      KAPACITOR_INFLUXDB_0_TOKEN: ${INFLUXDB_TOKEN:-your-super-secret-auth-token}
+    volumes:
+      - kapacitor_data:/var/lib/kapacitor
+      - ./kapacitor/kapacitor.conf:/etc/kapacitor/kapacitor.conf:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - mcp-network
+
+volumes:
+  influxdb_data:
+    driver: local
+  influxdb_config:
+    driver: local
+  redis_data:
+    driver: local
+  kapacitor_data:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16

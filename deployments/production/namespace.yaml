@@ -1,0 +1,246 @@
+# Production Kubernetes Namespaces for MCP Security Platform
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-security-platform
+  labels:
+    name: mcp-security-platform
+    environment: production
+    tier: application
+    security.istio.io/tlsMode: istio
+  annotations:
+    mcp.security/encryption: required
+    mcp.security/audit-level: high
+spec: {}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-data
+  labels:
+    name: mcp-data
+    environment: production
+    tier: data
+    security.istio.io/tlsMode: istio
+  annotations:
+    mcp.security/encryption: required
+    mcp.security/audit-level: high
+    mcp.security/backup: enabled
+spec: {}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-monitoring
+  labels:
+    name: mcp-monitoring
+    environment: production
+    tier: monitoring
+    security.istio.io/tlsMode: istio
+  annotations:
+    mcp.security/encryption: optional
+    mcp.security/audit-level: medium
+spec: {}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-security
+  labels:
+    name: mcp-security
+    environment: production
+    tier: security
+    security.istio.io/tlsMode: istio
+  annotations:
+    mcp.security/encryption: required
+    mcp.security/audit-level: critical
+spec: {}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-plugins
+  labels:
+    name: mcp-plugins
+    environment: production
+    tier: plugins
+    security.istio.io/tlsMode: istio
+  annotations:
+    mcp.security/encryption: required
+    mcp.security/audit-level: medium
+spec: {}
+
+---
+# Network Policy for namespace isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: mcp-security-platform
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-communication
+  namespace: mcp-security-platform
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security-platform
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-data
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-plugins
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security-platform
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-data
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-plugins
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow external HTTPS for APIs and feeds
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Resource Quotas for production workloads
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-quota
+  namespace: mcp-security-platform
+spec:
+  hard:
+    requests.cpu: "200"
+    requests.memory: 400Gi
+    limits.cpu: "400"
+    limits.memory: 800Gi
+    pods: "100"
+    persistentvolumeclaims: "50"
+    services: "20"
+    secrets: "100"
+    configmaps: "100"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: data-quota
+  namespace: mcp-data
+spec:
+  hard:
+    requests.cpu: "100"
+    requests.memory: 200Gi
+    limits.cpu: "200"
+    limits.memory: 400Gi
+    pods: "50"
+    persistentvolumeclaims: "100"
+    requests.storage: 50Ti
+
+---
+# Limit Ranges for container resource limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: container-limits
+  namespace: mcp-security-platform
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: 1000m
+      memory: 2Gi
+    defaultRequest:
+      cpu: 100m
+      memory: 256Mi
+    max:
+      cpu: 8000m
+      memory: 16Gi
+    min:
+      cpu: 50m
+      memory: 128Mi
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: pod-limits
+  namespace: mcp-security-platform
+spec:
+  limits:
+  - type: Pod
+    max:
+      cpu: 16000m
+      memory: 32Gi
+    min:
+      cpu: 100m
+      memory: 256Mi
+
+---
+# Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-standards
+  namespace: mcp-security-platform
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+data:
+  security-policy: |
+    # Pod Security Standards - Restricted
+    # - Containers must run as non-root user
+    # - Containers must not allow privilege escalation
+    # - Containers must drop all capabilities
+    # - Containers must use read-only root filesystem where possible
+    # - Containers must not use host networking, PID, or IPC namespaces

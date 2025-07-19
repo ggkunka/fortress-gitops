@@ -1,0 +1,537 @@
+# Istio Service Mesh Configuration for MCP Security Platform
+# This configuration sets up a comprehensive service mesh for secure, observable, and resilient communication
+
+---
+# Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: mcp-gateway
+  namespace: mcp-security-platform
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: mcp-tls-secret
+    hosts:
+    - api.mcp-security-platform.local
+    - app.mcp-security-platform.local
+    - grafana.mcp-security-platform.local
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - api.mcp-security-platform.local
+    - app.mcp-security-platform.local
+    redirect:
+      httpsRedirect: true
+
+---
+# Virtual Service for API routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mcp-api-vs
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - api.mcp-security-platform.local
+  gateways:
+  - mcp-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/v1/scan"
+    route:
+    - destination:
+        host: scan-service
+        port:
+          number: 8080
+    timeout: 300s
+    retries:
+      attempts: 3
+      perTryTimeout: 30s
+  - match:
+    - uri:
+        prefix: "/api/v1/vulnerability"
+    route:
+    - destination:
+        host: vulnerability-service
+        port:
+          number: 8080
+    timeout: 60s
+  - match:
+    - uri:
+        prefix: "/api/v1/compliance"
+    route:
+    - destination:
+        host: compliance-service
+        port:
+          number: 8080
+    timeout: 180s
+  - match:
+    - uri:
+        prefix: "/api/v1/reporting"
+    route:
+    - destination:
+        host: reporting-service
+        port:
+          number: 8080
+    timeout: 120s
+  - match:
+    - uri:
+        prefix: "/graphql"
+    route:
+    - destination:
+        host: graphql-service
+        port:
+          number: 8080
+  - match:
+    - uri:
+        prefix: "/ws"
+    route:
+    - destination:
+        host: websocket-service
+        port:
+          number: 8080
+    websocketUpgrade: true
+  - match:
+    - uri:
+        prefix: "/grpc"
+    route:
+    - destination:
+        host: grpc-service
+        port:
+          number: 50051
+
+---
+# Virtual Service for Frontend Application
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mcp-frontend-vs
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - app.mcp-security-platform.local
+  gateways:
+  - mcp-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: frontend-service
+        port:
+          number: 3000
+
+---
+# Destination Rules for load balancing and circuit breaking
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: scan-service-dr
+  namespace: mcp-security-platform
+spec:
+  host: scan-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      consecutiveServerErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: canary
+    labels:
+      version: canary
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: vulnerability-service-dr
+  namespace: mcp-security-platform
+spec:
+  host: vulnerability-service
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+    circuitBreaker:
+      consecutiveGatewayErrors: 3
+      interval: 15s
+      baseEjectionTime: 15s
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: compliance-service-dr
+  namespace: mcp-security-platform
+spec:
+  host: compliance-service
+  trafficPolicy:
+    loadBalancer:
+      simple: RANDOM
+    connectionPool:
+      tcp:
+        maxConnections: 30
+      http:
+        http1MaxPendingRequests: 15
+        http2MaxRequests: 30
+        maxRequestsPerConnection: 3
+        maxRetries: 2
+
+---
+# Authorization Policies for Zero Trust Security
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-access-control
+  namespace: mcp-security-platform
+spec:
+  selector:
+    matchLabels:
+      app: scan-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/mcp-security-platform/sa/frontend-service"]
+    - source:
+        principals: ["cluster.local/ns/mcp-security-platform/sa/api-gateway"]
+  - to:
+    - operation:
+        methods: ["GET", "POST"]
+  - when:
+    - key: request.headers[authorization]
+      notValues: [""]
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: admin-api-access
+  namespace: mcp-security-platform
+spec:
+  selector:
+    matchLabels:
+      app: reporting-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/mcp-security-platform/sa/admin-service"]
+  - to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+  - when:
+    - key: custom.admin_role
+      values: ["true"]
+
+---
+# Peer Authentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: mcp-security-platform
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Request Authentication with JWT
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: jwt-auth
+  namespace: mcp-security-platform
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  jwtRules:
+  - issuer: "https://auth.mcp-security-platform.local"
+    jwksUri: "https://auth.mcp-security-platform.local/.well-known/jwks.json"
+    audiences:
+    - "mcp-security-platform"
+    - "api.mcp-security-platform.local"
+    forwardOriginalToken: true
+
+---
+# Service Monitor for Prometheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-proxy-metrics
+  namespace: mcp-security-platform
+  labels:
+    app: istio-proxy
+spec:
+  ports:
+  - port: 15090
+    name: http-monitoring
+    protocol: TCP
+  selector:
+    app: istio-proxy
+
+---
+# Telemetry Configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-metrics
+  namespace: mcp-security-platform
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        environment:
+          value: "production"
+        platform:
+          value: "mcp-security-platform"
+
+---
+# Distributed Tracing Configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-tracing
+  namespace: mcp-security-platform
+spec:
+  tracing:
+  - providers:
+    - name: jaeger
+  - customTags:
+      service_version:
+        header:
+          name: "x-service-version"
+      user_id:
+        header:
+          name: "x-user-id"
+
+---
+# Envoy Filter for custom security headers
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: security-headers
+  namespace: mcp-security-platform
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_response(response_handle)
+              response_handle:headers():add("X-Content-Type-Options", "nosniff")
+              response_handle:headers():add("X-Frame-Options", "DENY")
+              response_handle:headers():add("X-XSS-Protection", "1; mode=block")
+              response_handle:headers():add("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+              response_handle:headers():add("Content-Security-Policy", "default-src 'self'")
+            end
+
+---
+# Service Entry for external dependencies
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-vulnerability-db
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - cve.mitre.org
+  - nvd.nist.gov
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-threat-intel
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - feeds.circl.lu
+  - malware-filter.gitlab.io
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Workload Entry for legacy systems
+apiVersion: networking.istio.io/v1beta1
+kind: WorkloadEntry
+metadata:
+  name: legacy-scan-engine
+  namespace: mcp-security-platform
+spec:
+  address: "10.0.1.100"
+  ports:
+    scan-api: 8080
+  labels:
+    app: legacy-scanner
+    version: v1
+
+---
+# Sidecar configuration for resource optimization
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: default
+  namespace: mcp-security-platform
+spec:
+  egress:
+  - hosts:
+    - "./*"
+    - "istio-system/*"
+    - "kube-system/kube-dns"
+  - hosts:
+    - "external-vulnerability-db"
+    - "external-threat-intel"
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+
+---
+# Fault Injection for Chaos Engineering
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: chaos-testing
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - scan-service
+  http:
+  - match:
+    - headers:
+        chaos-test:
+          exact: "delay"
+    fault:
+      delay:
+        percentage:
+          value: 10
+        fixedDelay: 5s
+    route:
+    - destination:
+        host: scan-service
+  - match:
+    - headers:
+        chaos-test:
+          exact: "abort"
+    fault:
+      abort:
+        percentage:
+          value: 5
+        httpStatus: 500
+    route:
+    - destination:
+        host: scan-service
+  - route:
+    - destination:
+        host: scan-service
+
+---
+# Retry Policy
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: retry-policy
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - vulnerability-service
+  http:
+  - route:
+    - destination:
+        host: vulnerability-service
+    retries:
+      attempts: 3
+      perTryTimeout: 30s
+      retryOn: gateway-error,connect-failure,refused-stream
+      retryRemoteLocalities: true
+
+---
+# Traffic Splitting for Canary Deployment
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: canary-deployment
+  namespace: mcp-security-platform
+spec:
+  hosts:
+  - scan-service
+  http:
+  - match:
+    - headers:
+        canary:
+          exact: "true"
+    route:
+    - destination:
+        host: scan-service
+        subset: canary
+      weight: 100
+  - route:
+    - destination:
+        host: scan-service
+        subset: v1
+      weight: 90
+    - destination:
+        host: scan-service
+        subset: canary
+      weight: 10

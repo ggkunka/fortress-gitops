@@ -1,0 +1,638 @@
+# ArgoCD GitOps Configuration for MCP Security Platform
+# This configuration sets up automated, secure deployments with GitOps principles
+
+---
+# ArgoCD Application for Core Services
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-core-services
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/mcp-platform/mcp-security-platform
+    targetRevision: main
+    path: deployments/core
+    helm:
+      valueFiles:
+      - values-production.yaml
+      parameters:
+      - name: image.tag
+        value: "v1.2.0"
+      - name: replicas
+        value: "3"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 3
+
+---
+# ArgoCD Application for Data Layer
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-data-layer
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/mcp-platform/mcp-security-platform
+    targetRevision: main
+    path: deployments/data
+    helm:
+      valueFiles:
+      - values-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - RespectIgnoreDifferences=true
+  ignoreDifferences:
+  - group: apps
+    kind: StatefulSet
+    jsonPointers:
+    - /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+
+---
+# ArgoCD Application for Plugin System
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-plugins
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/mcp-platform/mcp-security-platform
+    targetRevision: main
+    path: deployments/plugins
+    directory:
+      recurse: true
+      include: '*.yaml'
+      exclude: 'test-*.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-plugins
+  syncPolicy:
+    automated:
+      prune: false  # Don't auto-prune plugins
+      selfHeal: true
+
+---
+# ArgoCD Application for Monitoring Stack
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-monitoring
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/mcp-platform/mcp-security-platform
+    targetRevision: main
+    path: deployments/monitoring
+    helm:
+      valueFiles:
+      - values-production.yaml
+      parameters:
+      - name: prometheus.retention
+        value: "90d"
+      - name: grafana.adminPassword
+        value: "$argocd-secret:grafana-admin:password"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+
+---
+# ArgoCD Application for Security Infrastructure
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-security-infra
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/mcp-platform/mcp-security-platform
+    targetRevision: main
+    path: deployments/security
+    helm:
+      valueFiles:
+      - values-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - Validate=false  # Skip validation for CRDs
+
+---
+# ArgoCD Project for MCP Security Platform
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mcp-security-platform
+  namespace: argocd
+spec:
+  description: MCP Security Platform GitOps Project
+  sourceRepos:
+  - 'https://github.com/mcp-platform/mcp-security-platform'
+  - 'https://helm.elastic.co'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://kubernetes-charts.storage.googleapis.com'
+  destinations:
+  - namespace: 'mcp-*'
+    server: https://kubernetes.default.svc
+  - namespace: 'argocd'
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  - group: 'apiextensions.k8s.io'
+    kind: CustomResourceDefinition
+  - group: 'networking.istio.io'
+    kind: Gateway
+  - group: 'security.istio.io'
+    kind: PeerAuthentication
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: 'apps'
+    kind: Deployment
+  - group: 'apps'
+    kind: StatefulSet
+  - group: 'apps'
+    kind: DaemonSet
+  - group: 'batch'
+    kind: Job
+  - group: 'batch'
+    kind: CronJob
+  - group: 'networking.k8s.io'
+    kind: NetworkPolicy
+  - group: 'policy'
+    kind: PodSecurityPolicy
+  - group: 'monitoring.coreos.com'
+    kind: ServiceMonitor
+  - group: 'networking.istio.io'
+    kind: VirtualService
+  - group: 'networking.istio.io'
+    kind: DestinationRule
+  - group: 'security.istio.io'
+    kind: AuthorizationPolicy
+  roles:
+  - name: admin
+    description: Admin role for MCP Security Platform
+    policies:
+    - p, proj:mcp-security-platform:admin, applications, *, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:admin, repositories, *, *, allow
+    - p, proj:mcp-security-platform:admin, clusters, *, *, allow
+    groups:
+    - mcp-admins
+  - name: developer
+    description: Developer role for MCP Security Platform
+    policies:
+    - p, proj:mcp-security-platform:developer, applications, get, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, applications, sync, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, repositories, get, *, allow
+    groups:
+    - mcp-developers
+  - name: readonly
+    description: Read-only role for MCP Security Platform
+    policies:
+    - p, proj:mcp-security-platform:readonly, applications, get, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:readonly, repositories, get, *, allow
+    groups:
+    - mcp-viewers
+
+---
+# ArgoCD ApplicationSet for Multi-Environment Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: mcp-environments
+  namespace: argocd
+spec:
+  generators:
+  - clusters:
+      selector:
+        matchLabels:
+          environment: production
+  - clusters:
+      selector:
+        matchLabels:
+          environment: staging
+  - clusters:
+      selector:
+        matchLabels:
+          environment: development
+  template:
+    metadata:
+      name: 'mcp-{{name}}'
+    spec:
+      project: mcp-security-platform
+      source:
+        repoURL: https://github.com/mcp-platform/mcp-security-platform
+        targetRevision: '{{metadata.labels.branch}}'
+        path: deployments/overlays/{{metadata.labels.environment}}
+      destination:
+        server: '{{server}}'
+        namespace: mcp-security-platform
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+
+---
+# ArgoCD Notification Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  service.slack: |
+    token: $slack-token
+  template.app-deployed: |
+    email:
+      subject: New version of an application {{.app.metadata.name}} is up and running.
+    message: |
+      {{if eq .serviceType "slack"}}:white_check_mark:{{end}} Application {{.app.metadata.name}} is now running new version.
+    slack:
+      attachments: |
+        [{
+          "title": "{{ .app.metadata.name}}",
+          "title_link":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+          "color": "#18be52",
+          "fields": [
+          {
+            "title": "Sync Status",
+            "value": "{{.app.status.sync.status}}",
+            "short": true
+          },
+          {
+            "title": "Repository",
+            "value": "{{.app.spec.source.repoURL}}",
+            "short": true
+          },
+          {
+            "title": "Revision",
+            "value": "{{.app.status.sync.revision}}",
+            "short": true
+          }
+          {{range $index, $c := .app.status.conditions}}
+          {{if not $index}},{{end}}
+          {{if $index}},{{end}}
+          {
+            "title": "{{$c.type}}",
+            "value": "{{$c.message}}",
+            "short": true
+          }
+          {{end}}
+          ]
+        }]
+  template.app-health-degraded: |
+    email:
+      subject: Application {{.app.metadata.name}} has degraded.
+    message: |
+      {{if eq .serviceType "slack"}}:exclamation:{{end}} Application {{.app.metadata.name}} has degraded.
+      Application details: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}.
+    slack:
+      attachments: |
+        [{
+          "title": "{{ .app.metadata.name}}",
+          "title_link": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+          "color": "#f4c430",
+          "fields": [
+          {
+            "title": "Health Status",
+            "value": "{{.app.status.health.status}}",
+            "short": true
+          },
+          {
+            "title": "Repository",
+            "value": "{{.app.spec.source.repoURL}}",
+            "short": true
+          }
+          {{range $index, $c := .app.status.conditions}}
+          {{if not $index}},{{end}}
+          {{if $index}},{{end}}
+          {
+            "title": "{{$c.type}}",
+            "value": "{{$c.message}}",
+            "short": true
+          }
+          {{end}}
+          ]
+        }]
+  template.app-sync-failed: |
+    email:
+      subject: Failed to sync application {{.app.metadata.name}}.
+    message: |
+      {{if eq .serviceType "slack"}}:exclamation:{{end}}  The sync operation of application {{.app.metadata.name}} has failed at {{.app.status.operationState.finishedAt}} with the following error: {{.app.status.operationState.message}}
+      Sync operation details are available at: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true .
+    slack:
+      attachments: |
+        [{
+          "title": "{{ .app.metadata.name}}",
+          "title_link":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+          "color": "#E96D76",
+          "fields": [
+          {
+            "title": "Sync Status",
+            "value": "{{.app.status.sync.status}}",
+            "short": true
+          },
+          {
+            "title": "Repository",
+            "value": "{{.app.spec.source.repoURL}}",
+            "short": true
+          }
+          {{range $index, $c := .app.status.conditions}}
+          {{if not $index}},{{end}}
+          {{if $index}},{{end}}
+          {
+            "title": "{{$c.type}}",
+            "value": "{{$c.message}}",
+            "short": true
+          }
+          {{end}}
+          ]
+        }]
+  trigger.on-deployed: |
+    - description: Application is synced and healthy
+      send:
+      - app-deployed
+      when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+  trigger.on-health-degraded: |
+    - description: Application has degraded
+      send:
+      - app-health-degraded
+      when: app.status.health.status == 'Degraded'
+  trigger.on-sync-failed: |
+    - description: Application sync is failed
+      send:
+      - app-sync-failed
+      when: app.status.operationState.phase in ['Error', 'Failed']
+  subscriptions: |
+    - recipients:
+      - slack:mcp-deployments
+      triggers:
+      - on-deployed
+      - on-health-degraded
+      - on-sync-failed
+
+---
+# ArgoCD Repository Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mcp-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/mcp-platform/mcp-security-platform
+  password: ""
+  username: ""
+  sshPrivateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    # SSH private key would go here for private repositories
+    -----END OPENSSH PRIVATE KEY-----
+
+---
+# ArgoCD Cluster Secret for Multi-Cluster
+apiVersion: v1
+kind: Secret
+metadata:
+  name: staging-cluster
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+type: Opaque
+stringData:
+  name: staging-cluster
+  server: https://staging-k8s.mcp-platform.local
+  config: |
+    {
+      "bearerToken": "staging-cluster-token",
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "LS0tLS1CRUdJTi..."
+      }
+    }
+
+---
+# ArgoCD RBAC Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*, allow
+    p, role:developer, applications, create, */*, allow
+    p, role:developer, applications, update, */*, allow
+    p, role:developer, applications, delete, */*, deny
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, repositories, get, *, allow
+    
+    g, mcp-admins, role:admin
+    g, mcp-developers, role:developer
+    g, mcp-viewers, role:readonly
+
+---
+# ArgoCD Server Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-server-config
+  namespace: argocd
+data:
+  url: https://argocd.mcp-security-platform.local
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  server.rbac.log.enforce.enable: "true"
+  server.enable.grpc.web: "true"
+  
+  # OIDC Configuration
+  oidc.config: |
+    name: SSO
+    issuer: https://auth.mcp-security-platform.local
+    clientId: argocd
+    clientSecret: $oidc.clientSecret
+    requestedScopes: ["openid", "profile", "email", "groups"]
+    requestedIDTokenClaims: {"groups": {"essential": true}}
+  
+  # Resource customization
+  resource.customizations.health.argoproj.io_Application: |
+    hs = {}
+    hs.status = "Progressing"
+    hs.message = ""
+    if obj.status ~= nil then
+      if obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+    end
+    return hs
+
+---
+# Image Updater Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd
+data:
+  applications_api: argocd
+  argocd.grpc_web: "true"
+  argocd.server_addr: argocd-server.argocd.svc.cluster.local:443
+  argocd.insecure: "false"
+  log.level: debug
+  registries.conf: |
+    registries:
+    - name: Docker Hub
+      prefix: docker.io
+      api_url: https://registry-1.docker.io
+      credentials: secret:argocd/dockerhub-secret#creds
+      default: true
+    - name: Private Registry
+      prefix: registry.mcp-platform.local
+      api_url: https://registry.mcp-platform.local
+      credentials: secret:argocd/private-registry-secret#creds
+
+---
+# ArgoCD Image Updater Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-image-updater
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argocd-image-updater
+    spec:
+      serviceAccountName: argocd-image-updater
+      containers:
+      - name: argocd-image-updater
+        image: argoprojlabs/argocd-image-updater:v0.12.0
+        imagePullPolicy: Always
+        env:
+        - name: APPLICATIONS_API
+          valueFrom:
+            configMapKeyRef:
+              name: argocd-image-updater-config
+              key: applications_api
+        - name: ARGOCD_GRPC_WEB
+          valueFrom:
+            configMapKeyRef:
+              name: argocd-image-updater-config
+              key: argocd.grpc_web
+        - name: ARGOCD_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: argocd-image-updater-config
+              key: argocd.server_addr
+        - name: ARGOCD_INSECURE
+          valueFrom:
+            configMapKeyRef:
+              name: argocd-image-updater-config
+              key: argocd.insecure
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        - name: healthz
+          containerPort: 8081
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 3
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 3
+          periodSeconds: 30
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: registries-config
+          mountPath: /app/config/registries.conf
+          subPath: registries.conf
+      volumes:
+      - name: config
+        configMap:
+          name: argocd-image-updater-config
+      - name: registries-config
+        configMap:
+          name: argocd-image-updater-config
