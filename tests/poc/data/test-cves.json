@@ -1,0 +1,217 @@
+{
+  "cve_database": {
+    "version": "1.0",
+    "last_updated": "2024-01-15T10:30:00Z",
+    "total_cves": 4,
+    "source": "MCP Test Suite"
+  },
+  "cves": [
+    {
+      "cve_id": "CVE-2021-44228",
+      "published_date": "2021-12-10T10:00:00Z",
+      "last_modified": "2021-12-14T14:00:00Z",
+      "source": "NVD",
+      "cvss_v3": {
+        "base_score": 10.0,
+        "base_severity": "CRITICAL",
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+        "attack_vector": "NETWORK",
+        "attack_complexity": "LOW",
+        "privileges_required": "NONE",
+        "user_interaction": "NONE",
+        "scope": "CHANGED",
+        "confidentiality_impact": "HIGH",
+        "integrity_impact": "HIGH",
+        "availability_impact": "HIGH"
+      },
+      "description": "Apache Log4j2 2.0-beta9 through 2.15.0 JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.",
+      "cwe_ids": ["CWE-502", "CWE-917", "CWE-20"],
+      "references": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+          "source": "NVD"
+        },
+        {
+          "url": "https://logging.apache.org/log4j/2.x/security.html",
+          "source": "VENDOR_ADVISORY"
+        }
+      ],
+      "affected_products": [
+        "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+        "pkg:maven/org.apache.logging.log4j/log4j-api@2.14.1"
+      ],
+      "remediation": {
+        "type": "UPGRADE",
+        "details": "Upgrade to Log4j 2.17.0 or later",
+        "urgency": "IMMEDIATE"
+      },
+      "exploit_info": {
+        "exploit_available": true,
+        "exploit_in_wild": true,
+        "exploit_complexity": "LOW"
+      }
+    },
+    {
+      "cve_id": "CVE-2021-23337",
+      "published_date": "2021-02-15T14:00:00Z",
+      "last_modified": "2021-03-01T12:00:00Z", 
+      "source": "NVD",
+      "cvss_v3": {
+        "base_score": 7.2,
+        "base_severity": "HIGH",
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+        "attack_vector": "NETWORK",
+        "attack_complexity": "LOW",
+        "privileges_required": "HIGH",
+        "user_interaction": "NONE",
+        "scope": "UNCHANGED",
+        "confidentiality_impact": "HIGH",
+        "integrity_impact": "HIGH",
+        "availability_impact": "HIGH"
+      },
+      "description": "Lodash versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+      "cwe_ids": ["CWE-1321"],
+      "references": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-23337",
+          "source": "NVD"
+        },
+        {
+          "url": "https://github.com/lodash/lodash/security/advisories/GHSA-35jh-r3h4-6sjm",
+          "source": "GITHUB_ADVISORY"
+        }
+      ],
+      "affected_products": [
+        "pkg:npm/lodash@4.17.15",
+        "pkg:npm/lodash@4.17.14"
+      ],
+      "remediation": {
+        "type": "UPGRADE",
+        "details": "Upgrade to lodash 4.17.21 or later",
+        "urgency": "HIGH"
+      },
+      "exploit_info": {
+        "exploit_available": true,
+        "exploit_in_wild": false,
+        "exploit_complexity": "MEDIUM"
+      }
+    },
+    {
+      "cve_id": "CVE-2021-3807",
+      "published_date": "2021-09-17T07:00:00Z",
+      "last_modified": "2021-09-28T16:00:00Z",
+      "source": "NVD", 
+      "cvss_v3": {
+        "base_score": 9.1,
+        "base_severity": "CRITICAL",
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+        "attack_vector": "NETWORK",
+        "attack_complexity": "LOW",
+        "privileges_required": "NONE",
+        "user_interaction": "NONE",
+        "scope": "UNCHANGED",
+        "confidentiality_impact": "HIGH",
+        "integrity_impact": "NONE",
+        "availability_impact": "NONE"
+      },
+      "description": "ansi-regex is vulnerable to Regular Expression Denial of Service (ReDoS) due to improper input validation.",
+      "cwe_ids": ["CWE-835"],
+      "references": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-3807",
+          "source": "NVD"
+        },
+        {
+          "url": "https://github.com/chalk/ansi-regex/security/advisories/GHSA-93q8-gq69-wqmw",
+          "source": "GITHUB_ADVISORY"
+        }
+      ],
+      "affected_products": [
+        "pkg:npm/axios@0.21.0",
+        "pkg:npm/ansi-regex@5.0.0"
+      ],
+      "remediation": {
+        "type": "UPGRADE",
+        "details": "Upgrade to axios 0.21.2 or later which includes updated ansi-regex",
+        "urgency": "HIGH"
+      },
+      "exploit_info": {
+        "exploit_available": true,
+        "exploit_in_wild": false,
+        "exploit_complexity": "LOW"
+      }
+    },
+    {
+      "cve_id": "CVE-2021-23017",
+      "published_date": "2021-06-01T15:00:00Z",
+      "last_modified": "2021-06-15T10:00:00Z",
+      "source": "NVD",
+      "cvss_v3": {
+        "base_score": 7.7,
+        "base_severity": "HIGH",
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:N/I:N/A:H",
+        "attack_vector": "NETWORK",
+        "attack_complexity": "LOW", 
+        "privileges_required": "LOW",
+        "user_interaction": "NONE",
+        "scope": "CHANGED",
+        "confidentiality_impact": "NONE",
+        "integrity_impact": "NONE",
+        "availability_impact": "HIGH"
+      },
+      "description": "A security issue in nginx resolver was identified, which might allow an attacker who is able to forge UDP packets from the DNS server to cause 1-byte memory overwrite.",
+      "cwe_ids": ["CWE-787"],
+      "references": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-23017",
+          "source": "NVD"
+        },
+        {
+          "url": "http://nginx.org/en/security_advisories.html",
+          "source": "VENDOR_ADVISORY"
+        }
+      ],
+      "affected_products": [
+        "pkg:docker/nginx@1.20.1",
+        "pkg:docker/nginx@1.21.0"
+      ],
+      "remediation": {
+        "type": "UPGRADE", 
+        "details": "Upgrade to nginx 1.20.2, 1.21.5 or later",
+        "urgency": "MEDIUM"
+      },
+      "exploit_info": {
+        "exploit_available": false,
+        "exploit_in_wild": false,
+        "exploit_complexity": "HIGH"
+      }
+    }
+  ],
+  "statistics": {
+    "by_severity": {
+      "critical": 2,
+      "high": 2,
+      "medium": 0,
+      "low": 0
+    },
+    "by_cwe": {
+      "CWE-502": 1,
+      "CWE-917": 1,
+      "CWE-20": 1,
+      "CWE-1321": 1,
+      "CWE-835": 1,
+      "CWE-787": 1
+    },
+    "exploitation_status": {
+      "exploit_available": 3,
+      "exploit_in_wild": 1,
+      "no_exploit": 1
+    }
+  },
+  "test_metadata": {
+    "generated_by": "MCP Test Suite",
+    "purpose": "POC API Testing",
+    "environment": "test",
+    "coverage": "Log4Shell, ReDoS, Command Injection, Memory Corruption"
+  }
+}
