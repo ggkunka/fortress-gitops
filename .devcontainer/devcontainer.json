@@ -119,8 +119,8 @@
   },
 
   // Lifecycle scripts
-  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postCreate.sh",
-  "postStartCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postStart.sh",
+  "postCreateCommand": "pip install --user -r requirements.txt || true; pip install --user pytest pytest-asyncio httpx fastapi uvicorn; mkdir -p logs tmp; echo 'MCP Security Platform - Codespace ready!'",
+  "postStartCommand": "echo 'MCP Security Platform - Starting services...' && docker --version && buildah --version || echo 'Buildah not available'",
 
   // Set environment variables
   "containerEnv": {
