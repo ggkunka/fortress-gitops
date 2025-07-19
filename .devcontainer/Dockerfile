@@ -1,5 +1,5 @@
-# Use Microsoft's devcontainer base image
-FROM mcr.microsoft.com/devcontainers/python:3.11
+# Use Microsoft's devcontainer base image with Python 3.11
+FROM mcr.microsoft.com/devcontainers/python:1-3.11
 
 # Install system dependencies
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
@@ -15,6 +15,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         lsb-release \
         build-essential \
         libpq-dev \
+        postgresql-client \
+        redis-tools \
+        net-tools \
+        software-properties-common \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,17 +27,35 @@ RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 \
     && chmod +x ./kind \
     && mv ./kind /usr/local/bin/kind
 
-# Install Buildah
-RUN echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_$(lsb_release -rs)/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list \
-    && curl -L "https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_$(lsb_release -rs)/Release.key" | apt-key add - \
-    && apt-get update \
-    && apt-get -y install buildah \
+# Install Buildah using more reliable method
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+        podman \
+        buildah \
+        skopeo \
+        fuse-overlayfs \
+        slirp4netns \
+        uidmap \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    || { \
+        echo "Ubuntu repos failed, trying alternative installation..."; \
+        curl -fsSL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_$(lsb_release -rs)/Release.key | gpg --dearmor | tee /etc/apt/keyrings/devel_kubic_libcontainers_stable.gpg > /dev/null; \
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/devel_kubic_libcontainers_stable.gpg] https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_$(lsb_release -rs)/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list > /dev/null; \
+        apt-get update; \
+        apt-get -y install buildah podman skopeo; \
+        apt-get clean; \
+        rm -rf /var/lib/apt/lists/*; \
+    }
 
-# Install additional tools
-RUN curl -fsSL https://get.docker.com | sh \
-    && usermod -aG docker vscode
+# Configure containers for rootless mode
+RUN echo 'vscode:100000:65536' >> /etc/subuid \
+    && echo 'vscode:100000:65536' >> /etc/subgid \
+    && mkdir -p /home/vscode/.config/containers \
+    && echo 'unqualified-search-registries = ["docker.io"]' > /home/vscode/.config/containers/registries.conf \
+    && echo '[storage]' > /home/vscode/.config/containers/storage.conf \
+    && echo 'driver = "vfs"' >> /home/vscode/.config/containers/storage.conf \
+    && chown -R vscode:vscode /home/vscode/.config
 
 # Install yq for YAML processing
 RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
@@ -57,12 +79,25 @@ RUN pip install --user --upgrade pip \
         mypy \
         httpx \
         uvicorn \
-        fastapi
+        fastapi \
+        pandas \
+        matplotlib \
+        seaborn \
+        plotly \
+        jupyter \
+        ipywidgets \
+        structlog
 
 # Set up shell environment
 RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc \
     && echo 'alias k=kubectl' >> ~/.bashrc \
     && echo 'alias ll="ls -la"' >> ~/.bashrc \
-    && echo 'source <(kubectl completion bash)' >> ~/.bashrc
+    && echo 'source <(kubectl completion bash)' >> ~/.bashrc \
+    && echo 'alias mcp-demo="make poc-demo"' >> ~/.bashrc \
+    && echo 'alias mcp-test="make test"' >> ~/.bashrc \
+    && echo 'alias mcp-status="make services-status"' >> ~/.bashrc \
+    && echo 'export BUILDAH_ISOLATION=chroot' >> ~/.bashrc \
+    && echo 'export BUILDAH_FORMAT=docker' >> ~/.bashrc \
+    && echo 'export STORAGE_DRIVER=vfs' >> ~/.bashrc
 
 WORKDIR /workspace

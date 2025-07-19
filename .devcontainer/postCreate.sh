@@ -117,7 +117,7 @@ build_images() {
     log_info "Building container images locally..."
     
     # Check if we already have images
-    if docker images | grep -q "ghcr.io/ggkunka/mcp-"; then
+    if buildah images | grep -q "ghcr.io/ggkunka/mcp-"; then
         log_warning "Images already exist, skipping build"
         return 0
     fi
@@ -283,8 +283,12 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=port)
 EOF
         
-        # Build image
-        docker build -t "ghcr.io/ggkunka/mcp-${service}:latest" "$BUILD_DIR"
+        # Build image with Buildah
+        buildah build \
+            --format docker \
+            --isolation chroot \
+            --tag "ghcr.io/ggkunka/mcp-${service}:latest" \
+            "$BUILD_DIR"
         
         # Cleanup
         rm -rf "$BUILD_DIR"
