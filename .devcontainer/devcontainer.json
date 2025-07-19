@@ -119,8 +119,8 @@
   },
 
   // Lifecycle scripts
-  "postCreateCommand": "bash .devcontainer/postCreate.sh",
-  "postStartCommand": "bash .devcontainer/postStart.sh",
+  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postCreate.sh",
+  "postStartCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postStart.sh",
 
   // Set environment variables
   "containerEnv": {
