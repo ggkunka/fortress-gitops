@@ -119,8 +119,8 @@
   },
 
   // Lifecycle scripts
-  "postCreateCommand": "pip install --user -r requirements.txt || true; pip install --user pytest pytest-asyncio httpx fastapi uvicorn; mkdir -p logs tmp; echo 'MCP Security Platform - Codespace ready!'",
-  "postStartCommand": "echo 'MCP Security Platform - Starting services...' && docker --version && buildah --version || echo 'Buildah not available'",
+  "postCreateCommand": "pip install --user -r requirements.txt || true; pip install --user pytest pytest-asyncio httpx fastapi uvicorn; mkdir -p logs tmp; chmod +x scripts/*.sh; echo 'MCP Security Platform - Codespace ready!'",
+  "postStartCommand": "echo 'MCP Security Platform - Starting automatic deployment...' && ./scripts/codespace-setup.sh --auto",
 
   // Set environment variables
   "containerEnv": {

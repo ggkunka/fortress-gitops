@@ -5,6 +5,18 @@
 
 set -e
 
+# Check if running automatically (from devcontainer lifecycle)
+if [ "${1:-}" = "--auto" ] || [ "${CODESPACE_NAME:-}" != "" ]; then
+    echo "🤖 Automatic Codespace setup detected"
+    AUTO_SETUP=true
+    # Add logging for automatic setup
+    exec > >(tee -a /tmp/mcp-setup.log)
+    exec 2>&1
+    echo "📋 Setup log will be saved to /tmp/mcp-setup.log"
+else
+    AUTO_SETUP=false
+fi
+
 echo "🚀 Setting up MCP Security Platform POC..."
 echo "=================================================="
 
@@ -334,6 +346,13 @@ check_cluster_health() {
 
 # Cleanup function
 cleanup() {
+    if [ "$AUTO_SETUP" = true ]; then
+        log_info "Automatic setup completed - check /tmp/mcp-setup.log for details"
+        log_info "Setup log contents:"
+        echo "===================="
+        tail -20 /tmp/mcp-setup.log 2>/dev/null || echo "No log file found"
+        echo "===================="
+    fi
     log_info "Cleaning up on exit..."
     pkill -f "kubectl port-forward" || true
 }
