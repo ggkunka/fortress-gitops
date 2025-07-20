@@ -198,6 +198,24 @@ install_ingress() {
     log_success "NGINX Ingress Controller installed"
 }
 
+# Setup Helm repositories and dependencies
+setup_helm_dependencies() {
+    log_info "Setting up Helm repositories and dependencies..."
+    
+    # Add required Helm repositories
+    log_info "Adding Helm repositories..."
+    helm repo add bitnami https://charts.bitnami.com/bitnami
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo add grafana https://grafana.github.io/helm-charts
+    helm repo update
+    
+    # Build chart dependencies
+    log_info "Building Helm chart dependencies..."
+    helm dependency build ./deployments/helm/mcp-platform/
+    
+    log_success "Helm dependencies configured"
+}
+
 # Deploy MCP Platform using Helm
 deploy_mcp_platform() {
     log_info "Deploying MCP Security Platform..."
@@ -292,6 +310,7 @@ main() {
     create_kind_cluster
     load_images_to_kind
     install_ingress
+    setup_helm_dependencies
     deploy_mcp_platform
     check_cluster_health
     setup_port_forwarding
