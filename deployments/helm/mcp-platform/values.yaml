@@ -418,9 +418,9 @@ redis:
         memory: "1Gi"
         cpu: "500m"
   metrics:
-    enabled: true
+    enabled: false  # Disable to avoid ServiceMonitor CRD dependency
     serviceMonitor:
-      enabled: true
+      enabled: false
 
 postgresql:
   enabled: true
@@ -453,9 +453,9 @@ postgresql:
         memory: "2Gi"
         cpu: "1000m"
   metrics:
-    enabled: true
+    enabled: false  # Disable to avoid ServiceMonitor CRD dependency
     serviceMonitor:
-      enabled: true
+      enabled: false
 
 # Ingress configuration
 ingress:

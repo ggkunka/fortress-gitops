@@ -224,10 +224,10 @@ deploy_mcp_platform() {
     kubectl create namespace mcp-security --dry-run=client -o yaml | kubectl apply -f -
     
     # Use Codespaces-optimized values
-    local values_file=".devcontainer/codespaces-poc-values.yaml"
+    local values_file="./deployments/helm/mcp-platform/codespaces-poc-values.yaml"
     if [ ! -f "$values_file" ]; then
         log_warning "Codespaces POC values not found, using default minimal config"
-        values_file=".devcontainer/poc-values.yaml"
+        values_file="./deployments/helm/mcp-platform/values.yaml"
     fi
     
     log_info "Deploying with Codespaces-optimized configuration..."
