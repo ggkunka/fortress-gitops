@@ -42,12 +42,12 @@ spec:
             backend:
               {{- if semverCompare ">=1.19.0" $.Capabilities.KubeVersion.Version }}
               service:
-                name: {{ .service.name | default (printf "%s-gateway" $fullName) }}
+                name: {{ if .service }}{{ .service.name }}{{ else }}{{ printf "%s-gateway" $fullName }}{{ end }}
                 port:
-                  number: {{ .service.port | default $svcPort }}
+                  number: {{ if .service }}{{ .service.port }}{{ else }}{{ $svcPort }}{{ end }}
               {{- else }}
-              serviceName: {{ .service.name | default (printf "%s-gateway" $fullName) }}
-              servicePort: {{ .service.port | default $svcPort }}
+              serviceName: {{ if .service }}{{ .service.name }}{{ else }}{{ printf "%s-gateway" $fullName }}{{ end }}
+              servicePort: {{ if .service }}{{ .service.port }}{{ else }}{{ $svcPort }}{{ end }}
               {{- end }}
           {{- end }}
     {{- end }}
