@@ -178,8 +178,8 @@ services:
     enabled: true
     replicaCount: 2
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-ingestion-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-correlation-engine"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -214,8 +214,8 @@ services:
     enabled: true
     replicaCount: 3
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-enrichment-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-risk-assessment"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -259,8 +259,8 @@ services:
     enabled: true
     replicaCount: 2
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-analysis-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-response-orchestrator"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -290,8 +290,8 @@ services:
     enabled: true
     replicaCount: 2
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-notification-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-reporting-service"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -326,8 +326,8 @@ services:
     enabled: true
     replicaCount: 2
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-auth-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-graphql-server"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
@@ -361,8 +361,8 @@ services:
     enabled: true
     replicaCount: 2
     image:
-      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-gateway-service"
-      tag: "1.0.0"
+      repository: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageNamespace }}/mcp-websocket-server"
+      tag: "latest"
       pullPolicy: IfNotPresent
     service:
       type: ClusterIP
