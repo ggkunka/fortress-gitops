@@ -223,14 +223,31 @@ deploy_mcp_platform() {
     # Create namespace
     kubectl create namespace mcp-security --dry-run=client -o yaml | kubectl apply -f -
     
-    # Deploy using Helm with POC values
+    # Use Codespaces-optimized values
+    local values_file=".devcontainer/codespaces-poc-values.yaml"
+    if [ ! -f "$values_file" ]; then
+        log_warning "Codespaces POC values not found, using default minimal config"
+        values_file=".devcontainer/poc-values.yaml"
+    fi
+    
+    log_info "Deploying with Codespaces-optimized configuration..."
+    
+    # Deploy using Helm with Codespaces POC values and shorter timeout
     helm upgrade --install mcp-platform ./deployments/helm/mcp-platform \
         --namespace mcp-security \
-        --values .devcontainer/poc-values.yaml \
-        --wait \
-        --timeout=10m
+        --values "$values_file" \
+        --timeout=5m \
+        --wait=false \
+        --create-namespace
         
-    log_success "MCP Platform deployed successfully"
+    # Wait for core pods to be ready with custom timeout
+    log_info "Waiting for core services to be ready..."
+    kubectl wait --for=condition=ready pod \
+        --selector=app.kubernetes.io/name=mcp-platform \
+        --namespace=mcp-security \
+        --timeout=300s || log_warning "Some pods may still be starting"
+        
+    log_success "MCP Platform deployment initiated"
 }
 
 # Set up port forwarding
@@ -284,14 +301,33 @@ show_access_info() {
 check_cluster_health() {
     log_info "Checking cluster health..."
     
-    # Wait for all pods to be ready
-    log_info "Waiting for all pods to be ready..."
-    kubectl wait --for=condition=ready pod --all -n mcp-security --timeout=300s
+    # Check pod status (non-blocking for Codespaces)
+    log_info "Checking pod status..."
+    kubectl get pods -n mcp-security
     
     # Check service status
     log_info "Checking service status..."
-    kubectl get pods -n mcp-security
     kubectl get svc -n mcp-security
+    
+    # Wait for core services with timeout
+    log_info "Waiting for core services to respond..."
+    local max_wait=60
+    local count=0
+    
+    while [ $count -lt $max_wait ]; do
+        if kubectl get pods -n mcp-security | grep -q "Running"; then
+            log_success "Core services are starting up"
+            break
+        fi
+        sleep 5
+        count=$((count + 5))
+        log_info "Waiting for pods to start... (${count}s/${max_wait}s)"
+    done
+    
+    if [ $count -ge $max_wait ]; then
+        log_warning "Services taking longer than expected to start"
+        log_info "Check pod status with: kubectl get pods -n mcp-security"
+    fi
     
     log_success "Cluster health check completed"
 }

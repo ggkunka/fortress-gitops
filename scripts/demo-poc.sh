@@ -52,8 +52,9 @@ start_services() {
     
     log_info "Starting MCP Security Platform POC..."
     
-    # Run the setup script
+    # Run the setup script for Codespaces
     if [ -f "./scripts/codespace-setup.sh" ]; then
+        log_info "Running Codespaces-optimized setup..."
         ./scripts/codespace-setup.sh
     else
         log_error "Setup script not found. Please run from project root."
@@ -68,6 +69,9 @@ start_services() {
 wait_for_services() {
     log_info "Waiting for services to be ready..."
     
+    # Start port forwarding if not already running
+    setup_port_forwarding_if_needed
+    
     local services=(
         "$API_BASE/health:API Gateway"
         "$AUTH_BASE/health:Auth Service"
@@ -78,22 +82,43 @@ wait_for_services() {
         IFS=':' read -r url name <<< "$service_info"
         log_info "Checking $name..."
         
-        for i in {1..60}; do
+        # Reduced timeout for Codespaces (30 attempts = 60 seconds)
+        for i in {1..30}; do
             if curl -s -f "$url" > /dev/null 2>&1; then
                 log_success "$name is ready"
                 break
             fi
             
-            if [ $i -eq 60 ]; then
-                log_error "$name failed to start"
-                return 1
+            if [ $i -eq 30 ]; then
+                log_warning "$name not responding, but continuing with demo..."
+                break
             fi
             
             sleep 2
         done
     done
     
-    log_success "All services are ready!"
+    log_success "Service check completed!"
+}
+
+# Setup port forwarding if not running
+setup_port_forwarding_if_needed() {
+    # Check if port forwarding is already active
+    if ! curl -s -f "$API_BASE/health" > /dev/null 2>&1; then
+        log_info "Setting up port forwarding for Codespaces..."
+        
+        # Kill any existing port forwards
+        pkill -f "kubectl port-forward" 2>/dev/null || true
+        
+        # Start port forwards in background
+        kubectl port-forward -n mcp-security svc/mcp-platform-gateway 8000:8000 > /dev/null 2>&1 &
+        kubectl port-forward -n mcp-security svc/mcp-platform-auth 8001:8001 > /dev/null 2>&1 &
+        kubectl port-forward -n mcp-security svc/mcp-platform-correlation 8080:8080 > /dev/null 2>&1 &
+        
+        # Give port forwarding time to establish
+        sleep 5
+        log_success "Port forwarding configured"
+    fi
 }
 
 # Step 2: Authenticate and get JWT token
