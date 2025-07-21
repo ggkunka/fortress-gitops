@@ -1,7 +1,7 @@
 # Simplified Codespace deployment - reliable with standard Docker images
 global:
-  imageRegistry: "ghcr.io"
-  imageNamespace: "ggkunka"
+  imageRegistry: ""
+  imageNamespace: ""
 
 # Single replica for all services to fit in Codespace resources
 replicaCount: 1
@@ -90,7 +90,7 @@ services:
 postgresql:
   enabled: true
   image:
-    registry: ""
+    registry: "docker.io"
     repository: "postgres"
     tag: "13-alpine"
     pullPolicy: IfNotPresent
@@ -116,7 +116,7 @@ postgresql:
 redis:
   enabled: true
   image:
-    registry: ""
+    registry: "docker.io"
     repository: "redis"
     tag: "7.2-alpine"
     pullPolicy: IfNotPresent
