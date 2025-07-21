@@ -232,14 +232,27 @@ setup_helm_dependencies() {
 deploy_mcp_platform() {
     log_info "Deploying MCP Security Platform..."
     
+    # Cleanup any existing deployment that might have image pull issues
+    if helm list -n mcp-security | grep -q mcp-platform; then
+        log_warning "Existing MCP Platform deployment found, cleaning up..."
+        helm uninstall mcp-platform -n mcp-security || true
+        kubectl delete pods --all -n mcp-security || true
+        sleep 10
+    fi
+    
     # Create namespace
     kubectl create namespace mcp-security --dry-run=client -o yaml | kubectl apply -f -
     
     # Use Codespaces-optimized values
-    local values_file="./deployments/helm/mcp-platform/codespaces-poc-values.yaml"
+    # Use the new simplified configuration for Codespaces
+    local values_file="./deployments/helm/mcp-platform/codespace-simple-values.yaml"
     if [ ! -f "$values_file" ]; then
-        log_warning "Codespaces POC values not found, using default minimal config"
-        values_file="./deployments/helm/mcp-platform/values.yaml"
+        log_warning "Codespace simple values not found, falling back to POC values"
+        values_file="./deployments/helm/mcp-platform/codespaces-poc-values.yaml"
+        if [ ! -f "$values_file" ]; then
+            log_warning "Codespaces POC values not found, using default minimal config"
+            values_file="./deployments/helm/mcp-platform/values.yaml"
+        fi
     fi
     
     log_info "Deploying with Codespaces-optimized configuration..."
