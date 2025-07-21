@@ -86,56 +86,12 @@ services:
         cpu: "100m"
         memory: "128Mi"
 
-# Simplified PostgreSQL with standard Docker image
+# DISABLE problematic subcharts entirely
 postgresql:
-  enabled: true
-  image:
-    registry: "docker.io"
-    repository: "postgres"
-    tag: "13-alpine"
-    pullPolicy: IfNotPresent
-  auth:
-    postgresPassword: "mcp_password"
-    username: "mcp_user"
-    password: "mcp_password"
-    database: "mcp_security"
-  primary:
-    persistence:
-      enabled: false
-    resources:
-      requests:
-        cpu: "25m"
-        memory: "64Mi"
-      limits:
-        cpu: "200m"
-        memory: "256Mi"
-  metrics:
-    enabled: false
+  enabled: false
 
-# Simplified Redis with standard Docker image  
 redis:
-  enabled: true
-  image:
-    registry: "docker.io"
-    repository: "redis"
-    tag: "7.2-alpine"
-    pullPolicy: IfNotPresent
-  auth:
-    enabled: false
-  master:
-    persistence:
-      enabled: false
-    resources:
-      requests:
-        cpu: "25m"
-        memory: "32Mi"
-      limits:
-        cpu: "100m"
-        memory: "128Mi"
-  replica:
-    replicaCount: 0
-  metrics:
-    enabled: false
+  enabled: false
 
 # Disable resource-intensive components
 clickhouse:
