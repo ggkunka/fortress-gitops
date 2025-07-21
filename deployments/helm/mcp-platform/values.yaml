@@ -391,6 +391,11 @@ services:
 redis:
   enabled: true
   architecture: "replication"
+  image:
+    registry: "docker.io"
+    repository: "redis"
+    tag: "7.2-alpine"
+    pullPolicy: IfNotPresent
   auth:
     enabled: true
     password: "mcp-redis-password"
@@ -424,6 +429,11 @@ redis:
 
 postgresql:
   enabled: true
+  image:
+    registry: "docker.io"
+    repository: "postgres"
+    tag: "13-alpine"
+    pullPolicy: IfNotPresent
   auth:
     postgresPassword: "mcp-postgres-admin"
     username: "mcp_user"
