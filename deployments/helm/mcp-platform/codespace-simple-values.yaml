@@ -1,0 +1,175 @@
+# Simplified Codespace deployment - reliable with standard Docker images
+global:
+  imageRegistry: "ghcr.io"
+  imageNamespace: "ggkunka"
+
+# Single replica for all services to fit in Codespace resources
+replicaCount: 1
+
+# Service configurations with correct images
+services:
+  ingestion:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-correlation-engine"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  enrichment:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-risk-assessment"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  gateway:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-websocket-server"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  auth:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-graphql-server"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  analysis:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-response-orchestrator"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  notification:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-reporting-service"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+# Simplified PostgreSQL with standard Docker image
+postgresql:
+  enabled: true
+  image:
+    repository: "postgres"
+    tag: "13-alpine"
+    pullPolicy: IfNotPresent
+  auth:
+    postgresPassword: "mcp_password"
+    username: "mcp_user"
+    password: "mcp_password"
+    database: "mcp_security"
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+  metrics:
+    enabled: false
+
+# Simplified Redis with standard Docker image  
+redis:
+  enabled: true
+  image:
+    repository: "redis"
+    tag: "7.2-alpine"
+    pullPolicy: IfNotPresent
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "32Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: false
+
+# Disable resource-intensive components
+clickhouse:
+  enabled: false
+eventStore:
+  enabled: false
+grafana:
+  enabled: false
+influxdb:
+  enabled: false
+minio:
+  enabled: false
+mongodb:
+  enabled: false
+monitoring:
+  enabled: false
+neo4j:
+  enabled: false
+plugins:
+  enabled: false
+prometheus:
+  enabled: false
+spark:
+  enabled: false
+
+# Simple ingress for local access
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: mcp-platform-gateway
+            port: 8000
+  tls: []
