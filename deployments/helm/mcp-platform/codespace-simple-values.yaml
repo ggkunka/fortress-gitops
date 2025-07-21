@@ -90,6 +90,7 @@ services:
 postgresql:
   enabled: true
   image:
+    registry: ""
     repository: "postgres"
     tag: "13-alpine"
     pullPolicy: IfNotPresent
@@ -115,6 +116,7 @@ postgresql:
 redis:
   enabled: true
   image:
+    registry: ""
     repository: "redis"
     tag: "7.2-alpine"
     pullPolicy: IfNotPresent
