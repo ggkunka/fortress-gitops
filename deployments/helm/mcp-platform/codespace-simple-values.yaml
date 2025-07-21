@@ -95,7 +95,7 @@ redis:
     tag: "7.2"
     pullPolicy: IfNotPresent
   auth:
-    enabled: false  # Disable auth for POC
+    enabled: false  # Disable auth for POC simplicity
   master:
     persistence:
       enabled: false

@@ -92,8 +92,8 @@ postgresql:
   enabled: true
   image:
     registry: "docker.io"
-    repository: "postgres"
-    tag: "13-alpine"
+    repository: "bitnami/postgresql"
+    tag: "13"
     pullPolicy: IfNotPresent
   auth:
     postgresPassword: "mcp_password"
@@ -119,8 +119,8 @@ redis:
   enabled: true
   image:
     registry: "docker.io"
-    repository: "redis"
-    tag: "7.2-alpine"
+    repository: "bitnami/redis"
+    tag: "7.2"
     pullPolicy: IfNotPresent
   auth:
     enabled: true
