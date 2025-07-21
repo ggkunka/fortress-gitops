@@ -86,13 +86,56 @@ services:
         cpu: "100m"
         memory: "128Mi"
 
-# Use external Redis and PostgreSQL (deployed separately)
-# This avoids subchart image issues while providing required databases
-postgresql:
-  enabled: false  # We'll deploy our own simple PostgreSQL
-
+# Use Bitnami Redis from Docker Hub instead of GHCR
 redis:
-  enabled: false  # We'll deploy our own simple Redis
+  enabled: true
+  image:
+    registry: "docker.io"
+    repository: "bitnami/redis"
+    tag: "7.2"
+    pullPolicy: IfNotPresent
+  auth:
+    enabled: false  # Disable auth for POC
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "32Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: false
+
+# Use Bitnami PostgreSQL from Docker Hub
+postgresql:
+  enabled: true
+  image:
+    registry: "docker.io"
+    repository: "bitnami/postgresql"
+    tag: "13"
+    pullPolicy: IfNotPresent
+  auth:
+    postgresPassword: "mcp_password"
+    username: "mcp_user"
+    password: "mcp_password"
+    database: "mcp_security"
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+  metrics:
+    enabled: false
 
 # Disable resource-intensive components
 clickhouse:
