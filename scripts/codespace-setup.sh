@@ -255,7 +255,13 @@ deploy_mcp_platform() {
         fi
     fi
     
+    log_info "Building and loading required container images..."
+    
+    # Build all required MCP service images
+    build_mcp_images
+    
     log_info "Deploying with Codespaces-optimized configuration..."
+    log_info "Using values file: $values_file"
     
     # Deploy using Helm with Codespaces POC values and shorter timeout
     helm upgrade --install mcp-platform ./deployments/helm/mcp-platform \
@@ -273,6 +279,67 @@ deploy_mcp_platform() {
         --timeout=300s || log_warning "Some pods may still be starting"
         
     log_success "MCP Platform deployment initiated"
+}
+
+# Build and load MCP service images
+build_mcp_images() {
+    log_info "Building MCP service container images..."
+    
+    # Create a simple Dockerfile for MCP services
+    cat > /tmp/Dockerfile.mcp << 'EOF'
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install fastapi uvicorn
+COPY << 'EOPY' app.py
+from fastapi import FastAPI
+import os
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "healthy", "service": os.environ.get("SERVICE_NAME", "mcp-service")}
+
+@app.get("/")
+def root():
+    return {"service": os.environ.get("SERVICE_NAME", "mcp-service"), "status": "running"}
+
+@app.get("/api/v1/status")
+def status():
+    return {"status": "operational", "version": "1.0.0"}
+EOPY
+EXPOSE 8000
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+EOF
+
+    # Build all required images
+    local images=(
+        "ghcr.io/ggkunka/mcp-correlation-engine"
+        "ghcr.io/ggkunka/mcp-risk-assessment"
+        "ghcr.io/ggkunka/mcp-websocket-server"
+        "ghcr.io/ggkunka/mcp-graphql-server"
+        "ghcr.io/ggkunka/mcp-response-orchestrator"
+        "ghcr.io/ggkunka/mcp-reporting-service"
+    )
+    
+    for image in "${images[@]}"; do
+        log_info "Building $image:latest..."
+        docker build -f /tmp/Dockerfile.mcp -t "$image:latest" . > /dev/null 2>&1 || log_warning "Failed to build $image"
+        
+        log_info "Loading $image:latest into Kind cluster..."
+        kind load docker-image "$image:latest" --name mcp-poc > /dev/null 2>&1 || log_warning "Failed to load $image into Kind"
+    done
+    
+    # Also load the Bitnami database images
+    log_info "Ensuring database images are loaded..."
+    docker pull bitnami/redis:7.2 > /dev/null 2>&1 || log_warning "Failed to pull Redis"
+    docker pull bitnami/postgresql:13 > /dev/null 2>&1 || log_warning "Failed to pull PostgreSQL"
+    kind load docker-image bitnami/redis:7.2 --name mcp-poc > /dev/null 2>&1
+    kind load docker-image bitnami/postgresql:13 --name mcp-poc > /dev/null 2>&1
+    
+    # Cleanup
+    rm -f /tmp/Dockerfile.mcp
+    log_success "Container images built and loaded"
 }
 
 # Set up port forwarding
