@@ -77,7 +77,25 @@ The MCP Security Assessment Platform provides a robust, scalable solution for se
 
 ## Quick Start
 
-### Prerequisites
+### GitHub Codespaces (Fastest Option)
+
+The platform is optimized for GitHub Codespaces with automatic deployment:
+
+1. **Create a new Codespace** from the repository
+2. Wait for automatic setup to complete (~5 minutes)
+3. Run the POC demo:
+   ```bash
+   ./scripts/demo-poc.sh
+   ```
+
+**Manual Codespace Setup** (if needed):
+```bash
+# Pull latest changes and run setup
+git pull origin main
+./scripts/codespace-setup.sh --auto
+```
+
+### Prerequisites (Local Development)
 
 - Python 3.11+
 - Docker or Podman
