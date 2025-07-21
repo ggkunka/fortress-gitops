@@ -86,12 +86,13 @@ services:
         cpu: "100m"
         memory: "128Mi"
 
-# DISABLE problematic subcharts entirely
+# Use external Redis and PostgreSQL (deployed separately)
+# This avoids subchart image issues while providing required databases
 postgresql:
-  enabled: false
+  enabled: false  # We'll deploy our own simple PostgreSQL
 
 redis:
-  enabled: false
+  enabled: false  # We'll deploy our own simple Redis
 
 # Disable resource-intensive components
 clickhouse:
