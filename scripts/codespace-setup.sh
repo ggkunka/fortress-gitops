@@ -281,9 +281,32 @@ deploy_mcp_platform() {
     log_success "MCP Platform deployment initiated"
 }
 
-# Build and load MCP service images
+# Build and load MCP service images using the comprehensive build script
 build_mcp_images() {
-    log_info "Building MCP service container images..."
+    log_info "Building MCP service container images using build-all-services.sh..."
+    
+    # Check if our comprehensive build script exists
+    if [ -f "./build-all-services.sh" ]; then
+        log_info "Using comprehensive build script with proper business logic..."
+        
+        # Make sure it's executable
+        chmod +x ./build-all-services.sh
+        
+        # Run the comprehensive build script
+        ./build-all-services.sh
+        
+        log_success "All MCP services built with proper business logic"
+    else
+        log_warning "Comprehensive build script not found, falling back to simple builds..."
+        
+        # Fallback to simple builds
+        build_simple_mcp_images
+    fi
+}
+
+# Fallback function for simple image builds
+build_simple_mcp_images() {
+    log_info "Building simple MCP service container images..."
     
     # Create a simple Dockerfile for MCP services
     cat > /tmp/Dockerfile.mcp << 'EOF'
