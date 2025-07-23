@@ -1,0 +1,90 @@
+{
+  "report_id": "mcp-poc-1753292259",
+  "generated_at": "2025-07-23T23:07:39.482949",
+  "executive_summary": {
+    "risk_level": "HIGH",
+    "critical_findings": 1,
+    "immediate_actions_required": 2,
+    "estimated_remediation_time": "48-72 hours"
+  },
+  "vulnerability_data": {
+    "scan_id": "poc-demo-1753292257",
+    "timestamp": "2025-07-23T23:07:37.482517",
+    "vulnerabilities": [
+      {
+        "id": "CVE-2023-1234",
+        "severity": "HIGH",
+        "package": "nginx",
+        "version": "1.18.0",
+        "description": "Buffer overflow in nginx HTTP/2 implementation",
+        "cvss_score": 8.1,
+        "exploit_available": true
+      },
+      {
+        "id": "CVE-2023-5678",
+        "severity": "CRITICAL",
+        "package": "openssl",
+        "version": "1.1.1k",
+        "description": "Remote code execution in OpenSSL certificate parsing",
+        "cvss_score": 9.8,
+        "exploit_available": true
+      },
+      {
+        "id": "CVE-2023-9999",
+        "severity": "MEDIUM",
+        "package": "curl",
+        "version": "7.68.0",
+        "description": "Information disclosure in HTTP header processing",
+        "cvss_score": 5.3,
+        "exploit_available": false
+      }
+    ],
+    "summary": {
+      "total_vulnerabilities": 3,
+      "critical": 1,
+      "high": 1,
+      "medium": 1,
+      "low": 0
+    }
+  },
+  "ai_analysis": {
+    "risk_assessment": {
+      "overall_risk": "HIGH",
+      "confidence": 0.92,
+      "priority_score": 8.5
+    },
+    "recommendations": [
+      "IMMEDIATE: Upgrade OpenSSL to version 3.0.7+ to address CVE-2023-5678",
+      "HIGH PRIORITY: Update nginx to version 1.20+ to fix HTTP/2 vulnerability",
+      "MEDIUM PRIORITY: Upgrade curl to version 7.88.0+ for header processing fix"
+    ],
+    "attack_scenarios": [
+      {
+        "scenario": "Remote Code Execution Chain",
+        "probability": "HIGH",
+        "impact": "System Compromise",
+        "description": "Attacker exploits OpenSSL vulnerability to gain initial access, then leverages nginx vulnerability for privilege escalation"
+      },
+      {
+        "scenario": "Information Disclosure Attack",
+        "probability": "MEDIUM",
+        "impact": "Data Exposure",
+        "description": "Curl vulnerability exposes sensitive headers, potentially revealing authentication tokens"
+      }
+    ],
+    "business_impact": {
+      "financial_risk": "$500K - $2M potential losses",
+      "compliance_issues": [
+        "PCI-DSS non-compliance",
+        "SOX reporting concerns"
+      ],
+      "reputation_damage": "High risk of customer trust loss"
+    }
+  },
+  "next_steps": [
+    "Deploy emergency patches for critical vulnerabilities",
+    "Implement network segmentation to limit blast radius",
+    "Schedule comprehensive security audit",
+    "Update incident response procedures"
+  ]
+}

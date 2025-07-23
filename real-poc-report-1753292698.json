@@ -1,0 +1,48 @@
+{
+  "report_id": "real-mcp-poc-1753292698",
+  "generated_at": "2025-07-23T23:14:58.171092",
+  "scan_summary": {
+    "image_analyzed": "redis:8.0.3",
+    "total_vulnerabilities": 76,
+    "severity_breakdown": {
+      "High": 8,
+      "Low": 8,
+      "Negligible": 47,
+      "Medium": 13
+    },
+    "scan_tool": "Grype + Syft"
+  },
+  "ai_analysis": {
+    "overall_risk_level": "MEDIUM",
+    "confidence_score": 0.8,
+    "key_concerns": [
+      "Multiple Perl-related vulnerabilities present",
+      "PAM authentication system vulnerabilities",
+      "System-level library vulnerabilities"
+    ],
+    "attack_vectors": [
+      {
+        "scenario": "Privilege Escalation via PAM",
+        "probability": "MEDIUM",
+        "impact": "System compromise"
+      }
+    ],
+    "recommendations": [
+      "Update Redis base image to latest version",
+      "Apply security patches for system libraries",
+      "Implement container security best practices"
+    ],
+    "analysis_method": "simulated_fallback"
+  },
+  "raw_vulnerability_data": {
+    "total_packages": 90,
+    "vulnerability_matches": 76,
+    "high_severity_count": 8,
+    "medium_severity_count": 13
+  },
+  "executive_summary": {
+    "risk_level": "MEDIUM",
+    "confidence": "80%",
+    "immediate_action_required": true
+  }
+}
