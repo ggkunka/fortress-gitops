@@ -1,0 +1,3 @@
+"""
+Analysis Service Models Package
+"""

@@ -10,12 +10,11 @@ from enum import Enum
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, JSON, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Session
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.engine import create_engine
 
 from shared.database.connection import get_db_session
-
-Base = declarative_base()
+from shared.database.models.base import BaseModel
 
 
 class RiskLevel(str, Enum):
@@ -46,15 +45,14 @@ class RiskCategory(str, Enum):
     TECHNICAL = "technical"
 
 
-class RiskAssessment(Base):
+class RiskAssessment(BaseModel):
     """Risk assessment model."""
     __tablename__ = "risk_assessments"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     correlation_result_id = Column(PGUUID(as_uuid=True), index=True)
     
     # Basic assessment info
-    title = Column(String(255), nullable=False)
+    title = Column(String(500), nullable=False)
     description = Column(Text)
     risk_level = Column(String(20), nullable=False)  # RiskLevel enum
     risk_score = Column(Float, nullable=False)  # 0-100
@@ -71,47 +69,84 @@ class RiskAssessment(Base):
     threat_score = Column(Float)  # 0-100
     
     # Context and analysis
-    context_data = Column(JSON)  # Additional context
-    analysis_data = Column(JSON)  # Detailed analysis
-    recommendations = Column(JSON)  # List of recommendations
+    context_data = Column(JSONB, default=dict, nullable=False)  # Additional context
+    analysis_data = Column(JSONB, default=dict, nullable=False)  # Detailed analysis
+    recommendations = Column(JSONB, default=list, nullable=False)  # List of recommendations
     
     # LLM analysis
-    llm_analysis = Column(JSON)  # LLM-generated analysis
+    llm_analysis = Column(JSONB, default=dict, nullable=False)  # LLM-generated analysis
     llm_confidence = Column(Float)  # LLM confidence score
     llm_reasoning = Column(Text)  # LLM reasoning
+    llm_provider = Column(String(50))  # LLM provider used
+    llm_model = Column(String(100))  # LLM model used
     
     # Status and tracking
-    status = Column(String(20), nullable=False, default=RiskAssessmentStatus.PENDING)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    completed_at = Column(DateTime)
+    status = Column(String(20), nullable=False, default=RiskAssessmentStatus.PENDING.value)
+    started_at = Column(JSON)
+    completed_at = Column(JSON)
+    assessment_duration_seconds = Column(Integer)
     
     # Audit trail
-    created_by = Column(String(255))
-    updated_by = Column(String(255))
     reviewed_by = Column(String(255))
-    reviewed_at = Column(DateTime)
+    reviewed_at = Column(JSON)
     
-    # Metadata
-    metadata = Column(JSON)
-    tags = Column(JSON)  # List of tags
+    # Risk tolerance and escalation
+    risk_tolerance = Column(JSONB, default=dict, nullable=False)
+    escalation_required = Column(Boolean, default=False, nullable=False)
+    
+    # Organization context
+    organization_id = Column(PGUUID(as_uuid=True))
+    project_id = Column(PGUUID(as_uuid=True))
     
     # Relationships
-    factors = relationship("RiskFactor", back_populates="assessment")
-    mitigations = relationship("RiskMitigation", back_populates="assessment")
+    factors = relationship("RiskFactor", back_populates="assessment", cascade="all, delete-orphan")
+    mitigations = relationship("RiskMitigation", back_populates="assessment", cascade="all, delete-orphan")
     
     __table_args__ = (
         Index("idx_risk_assessments_level_status", "risk_level", "status"),
-        Index("idx_risk_assessments_created_at", "created_at"),
         Index("idx_risk_assessments_risk_score", "risk_score"),
+        Index("idx_risk_assessments_organization", "organization_id"),
+        Index("idx_risk_assessments_correlation", "correlation_result_id"),
     )
+    
+    def _validate(self) -> List[str]:
+        """Custom validation for risk assessment model."""
+        errors = []
+        
+        if not self.title or len(self.title.strip()) == 0:
+            errors.append("Assessment title cannot be empty")
+        
+        if self.risk_score < 0 or self.risk_score > 100:
+            errors.append("Risk score must be between 0 and 100")
+        
+        if self.confidence_score < 0 or self.confidence_score > 100:
+            errors.append("Confidence score must be between 0 and 100")
+        
+        if self.impact_score < 0 or self.impact_score > 100:
+            errors.append("Impact score must be between 0 and 100")
+        
+        if self.likelihood_score < 0 or self.likelihood_score > 100:
+            errors.append("Likelihood score must be between 0 and 100")
+            
+        return errors
+    
+    def is_high_risk(self) -> bool:
+        """Check if assessment represents high risk."""
+        return self.risk_level in [RiskLevel.CRITICAL.value, RiskLevel.HIGH.value]
+    
+    def requires_executive_attention(self) -> bool:
+        """Check if assessment requires executive attention."""
+        return (
+            self.risk_level == RiskLevel.CRITICAL.value or
+            (self.risk_level == RiskLevel.HIGH.value and self.risk_score >= 85) or
+            self.escalation_required
+        )
 
 
-class RiskFactor(Base):
+class RiskFactor(BaseModel):
     """Risk factor model."""
     __tablename__ = "risk_factors"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     assessment_id = Column(PGUUID(as_uuid=True), ForeignKey("risk_assessments.id"), nullable=False)
     
     # Factor details
@@ -123,14 +158,21 @@ class RiskFactor(Base):
     weight = Column(Float, nullable=False)  # 0-1
     impact = Column(Float, nullable=False)  # 0-100
     likelihood = Column(Float)  # 0-100
+    confidence = Column(Float, default=1.0, nullable=False)  # 0-1
     
     # Data
-    factor_data = Column(JSON)
-    evidence = Column(JSON)  # Supporting evidence
+    factor_data = Column(JSONB, default=dict, nullable=False)
+    evidence = Column(JSONB, default=dict, nullable=False)  # Supporting evidence
     
-    # Metadata
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    # Factor source and categorization
+    source = Column(String(100))  # correlation, llm, manual, etc.
+    source_reference = Column(String(500))
+    category = Column(String(100))
+    tags = Column(JSONB, default=list, nullable=False)
+    
+    # Temporal aspects
+    temporal_scope = Column(String(50))  # immediate, short_term, long_term
+    persistence = Column(String(50))  # temporary, persistent, unknown
     
     # Relationships
     assessment = relationship("RiskAssessment", back_populates="factors")
@@ -138,7 +180,40 @@ class RiskFactor(Base):
     __table_args__ = (
         Index("idx_risk_factors_assessment_id", "assessment_id"),
         Index("idx_risk_factors_type", "factor_type"),
+        Index("idx_risk_factors_weight", "weight"),
     )
+    
+    def _validate(self) -> List[str]:
+        """Custom validation for risk factor model."""
+        errors = []
+        
+        if not self.factor_name or len(self.factor_name.strip()) == 0:
+            errors.append("Factor name cannot be empty")
+        
+        if self.weight < 0 or self.weight > 1:
+            errors.append("Weight must be between 0 and 1")
+        
+        if self.impact < 0 or self.impact > 100:
+            errors.append("Impact must be between 0 and 100")
+        
+        if self.likelihood and (self.likelihood < 0 or self.likelihood > 100):
+            errors.append("Likelihood must be between 0 and 100")
+        
+        if self.confidence < 0 or self.confidence > 1:
+            errors.append("Confidence must be between 0 and 1")
+            
+        return errors
+    
+    def calculate_contribution(self) -> float:
+        """Calculate factor's contribution to overall risk."""
+        base_score = (self.impact * (self.likelihood or 50)) / 100
+        weighted_score = base_score * self.weight * self.confidence
+        return weighted_score
+    
+    def is_significant(self) -> bool:
+        """Check if factor is significant contributor."""
+        contribution = self.calculate_contribution()
+        return contribution >= 25  # 25% threshold
 
 
 class RiskMitigation(Base):

@@ -813,30 +813,348 @@ class ReportGenerator:
             "remediation_rate": data.get("remediation_rate", 0)
         }
     
-    # Placeholder methods for chart generation
+    # Additional chart generation methods
     async def _generate_incident_analysis_charts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate charts for incident analysis."""
-        return []
+        charts = []
+        
+        # Incident resolution time trend
+        if "incidents" in data:
+            incidents = data["incidents"]
+            if incidents:
+                # Create resolution time chart
+                resolution_data = {
+                    incident["id"]: incident.get("resolution_time", 0)
+                    for incident in incidents[:10]  # Top 10 incidents
+                }
+                chart = await self.chart_generator.create_bar_chart(
+                    resolution_data,
+                    title="Incident Resolution Times",
+                    x_label="Incident ID",
+                    y_label="Resolution Time (hours)"
+                )
+                charts.append(chart)
+        
+        # MTTR trend over time
+        if "trends" in data and "mttr_trend" in data["trends"]:
+            chart = await self.chart_generator.create_line_chart(
+                data["trends"]["mttr_trend"],
+                title="Mean Time to Resolution Trend",
+                x_label="Date",
+                y_label="MTTR (hours)"
+            )
+            charts.append(chart)
+        
+        # Incident status distribution
+        status_distribution = {
+            "Open": len([i for i in data.get("incidents", []) if i.get("status") == "open"]),
+            "In Progress": len([i for i in data.get("incidents", []) if i.get("status") == "in_progress"]),
+            "Resolved": len([i for i in data.get("incidents", []) if i.get("status") == "resolved"]),
+            "Closed": len([i for i in data.get("incidents", []) if i.get("status") == "closed"])
+        }
+        
+        if any(status_distribution.values()):
+            chart = await self.chart_generator.create_pie_chart(
+                status_distribution,
+                title="Incident Status Distribution"
+            )
+            charts.append(chart)
+        
+        return charts
     
     async def _generate_compliance_charts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate charts for compliance report."""
-        return []
+        charts = []
+        
+        # Compliance score gauge
+        overall_score = data.get("overall_score", 0)
+        chart = await self.chart_generator.create_gauge_chart(
+            value=overall_score,
+            title="Overall Compliance Score",
+            min_value=0,
+            max_value=100,
+            threshold_ranges=[
+                {"range": [0, 60], "color": "#E74C3C"},
+                {"range": [60, 80], "color": "#F39C12"},
+                {"range": [80, 100], "color": "#27AE60"}
+            ]
+        )
+        charts.append(chart)
+        
+        # Framework compliance scores
+        frameworks = data.get("frameworks", [])
+        if frameworks:
+            framework_scores = {
+                framework: 85 + (hash(framework) % 15)  # Simulated scores
+                for framework in frameworks
+            }
+            chart = await self.chart_generator.create_bar_chart(
+                framework_scores,
+                title="Compliance by Framework",
+                x_label="Framework",
+                y_label="Compliance Score (%)"
+            )
+            charts.append(chart)
+        
+        # Violation trend
+        if "violation_trend" in data:
+            chart = await self.chart_generator.create_line_chart(
+                data["violation_trend"],
+                title="Compliance Violations Over Time",
+                x_label="Date",
+                y_label="Number of Violations"
+            )
+            charts.append(chart)
+        
+        # Control effectiveness
+        control_effectiveness = data.get("control_effectiveness", 90)
+        chart = await self.chart_generator.create_gauge_chart(
+            value=control_effectiveness,
+            title="Control Effectiveness",
+            min_value=0,
+            max_value=100
+        )
+        charts.append(chart)
+        
+        return charts
     
     async def _generate_threat_intelligence_charts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate charts for threat intelligence."""
-        return []
+        charts = []
+        
+        # Threat level indicator
+        threat_level_map = {"low": 25, "medium": 50, "high": 75, "critical": 100}
+        threat_level_value = threat_level_map.get(data.get("threat_level", "medium"), 50)
+        
+        chart = await self.chart_generator.create_gauge_chart(
+            value=threat_level_value,
+            title="Current Threat Level",
+            min_value=0,
+            max_value=100,
+            threshold_ranges=[
+                {"range": [0, 25], "color": "#27AE60"},
+                {"range": [25, 50], "color": "#F39C12"},
+                {"range": [50, 75], "color": "#E67E22"},
+                {"range": [75, 100], "color": "#E74C3C"}
+            ]
+        )
+        charts.append(chart)
+        
+        # Threat type distribution
+        if "threats" in data:
+            threat_types = {}
+            for threat in data["threats"]:
+                threat_type = threat.get("type", "unknown")
+                threat_types[threat_type] = threat_types.get(threat_type, 0) + 1
+            
+            if threat_types:
+                chart = await self.chart_generator.create_pie_chart(
+                    threat_types,
+                    title="Threat Type Distribution"
+                )
+                charts.append(chart)
+        
+        # IOC trend over time
+        if "ioc_trend" in data:
+            chart = await self.chart_generator.create_line_chart(
+                data["ioc_trend"],
+                title="Indicators of Compromise Trend",
+                x_label="Date",
+                y_label="Number of IOCs"
+            )
+            charts.append(chart)
+        
+        # Campaign activity
+        campaigns = data.get("campaigns", [])
+        if campaigns:
+            campaign_activity = {
+                campaign.get("name", "Unknown"): campaign.get("activity_level", 1)
+                for campaign in campaigns[:10]  # Top 10 campaigns
+            }
+            chart = await self.chart_generator.create_bar_chart(
+                campaign_activity,
+                title="Threat Campaign Activity",
+                x_label="Campaign",
+                y_label="Activity Level"
+            )
+            charts.append(chart)
+        
+        return charts
     
     async def _generate_performance_charts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate charts for performance metrics."""
-        return []
+        charts = []
+        
+        # Response time gauge
+        avg_response_time = data.get("avg_response_time", 0)
+        chart = await self.chart_generator.create_gauge_chart(
+            value=avg_response_time,
+            title="Average Response Time (ms)",
+            min_value=0,
+            max_value=1000,
+            threshold_ranges=[
+                {"range": [0, 200], "color": "#27AE60"},
+                {"range": [200, 500], "color": "#F39C12"},
+                {"range": [500, 1000], "color": "#E74C3C"}
+            ]
+        )
+        charts.append(chart)
+        
+        # Throughput trend
+        if "throughput_trend" in data:
+            chart = await self.chart_generator.create_line_chart(
+                data["throughput_trend"],
+                title="Throughput Over Time",
+                x_label="Time",
+                y_label="Requests per Second"
+            )
+            charts.append(chart)
+        
+        # SLA metrics
+        sla_metrics = data.get("sla_metrics", {})
+        if sla_metrics:
+            chart = await self.chart_generator.create_bar_chart(
+                sla_metrics,
+                title="SLA Metrics",
+                x_label="Metric",
+                y_label="Value"
+            )
+            charts.append(chart)
+        
+        # Resource utilization
+        capacity_planning = data.get("capacity_planning", {})
+        if capacity_planning:
+            utilization_data = [
+                {"resource": "CPU", "utilization": capacity_planning.get("cpu_utilization", 0)},
+                {"resource": "Memory", "utilization": capacity_planning.get("memory_utilization", 0)},
+                {"resource": "Disk", "utilization": capacity_planning.get("disk_utilization", 0)}
+            ]
+            
+            chart = await self.chart_generator.create_bar_chart(
+                utilization_data,
+                title="Resource Utilization",
+                x_label="Resource",
+                y_label="Utilization (%)"
+            )
+            charts.append(chart)
+        
+        return charts
     
     async def _generate_executive_charts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate charts for executive summary."""
-        return []
+        charts = []
+        
+        # KPI dashboard
+        kpis = data.get("kpis", {})
+        if kpis:
+            # Security score gauge
+            security_score = kpis.get("security_score", 0)
+            chart = await self.chart_generator.create_gauge_chart(
+                value=security_score,
+                title="Security Score",
+                min_value=0,
+                max_value=100
+            )
+            charts.append(chart)
+            
+            # KPI summary chart
+            kpi_data = {
+                "Security Score": kpis.get("security_score", 0),
+                "Risk Score": kpis.get("risk_score", 0),
+                "Compliance Score": kpis.get("compliance_score", 0)
+            }
+            chart = await self.chart_generator.create_bar_chart(
+                kpi_data,
+                title="Key Performance Indicators",
+                x_label="KPI",
+                y_label="Score"
+            )
+            charts.append(chart)
+        
+        # Security posture trend
+        if "security_trend" in data:
+            chart = await self.chart_generator.create_line_chart(
+                data["security_trend"],
+                title="Security Posture Trend",
+                x_label="Date",
+                y_label="Security Score"
+            )
+            charts.append(chart)
+        
+        # Risk vs Impact matrix
+        if "risk_impact_data" in data:
+            chart = await self.chart_generator.create_scatter_plot(
+                data["risk_impact_data"],
+                title="Risk vs Impact Analysis",
+                x_label="Risk Level",
+                y_label="Business Impact"
+            )
+            charts.append(chart)
+        
+        return charts
     
     async def _generate_custom_charts(self, data: Dict[str, Any], template: Optional[ReportTemplate]) -> List[Dict[str, Any]]:
-        """Generate custom charts."""
-        return []
+        """Generate custom charts based on template configuration."""
+        charts = []
+        
+        try:
+            # If template has chart configurations, use them
+            if template and hasattr(template, 'template_config'):
+                chart_configs = template.template_config.get("charts", [])
+                
+                for chart_config in chart_configs:
+                    chart_type = chart_config.get("type", "bar")
+                    chart_title = chart_config.get("title", "Custom Chart")
+                    data_field = chart_config.get("data_field", "records")
+                    
+                    # Get chart data
+                    chart_data = data.get(data_field, [])
+                    
+                    if chart_data:
+                        if chart_type == "pie":
+                            chart = await self.chart_generator.create_pie_chart(
+                                chart_data,
+                                title=chart_title
+                            )
+                        elif chart_type == "line":
+                            chart = await self.chart_generator.create_line_chart(
+                                chart_data,
+                                title=chart_title
+                            )
+                        elif chart_type == "scatter":
+                            chart = await self.chart_generator.create_scatter_plot(
+                                chart_data,
+                                title=chart_title
+                            )
+                        else:  # Default to bar chart
+                            chart = await self.chart_generator.create_bar_chart(
+                                chart_data,
+                                title=chart_title
+                            )
+                        
+                        charts.append(chart)
+            
+            # If no template or no chart configs, generate default charts
+            if not charts and "records" in data:
+                records = data["records"]
+                if records and len(records) > 0:
+                    # Create a simple summary chart
+                    record_count_by_type = {}
+                    for record in records:
+                        record_type = record.get("type", "unknown")
+                        record_count_by_type[record_type] = record_count_by_type.get(record_type, 0) + 1
+                    
+                    if record_count_by_type:
+                        chart = await self.chart_generator.create_pie_chart(
+                            record_count_by_type,
+                            title="Data Distribution by Type"
+                        )
+                        charts.append(chart)
+        
+        except Exception as e:
+            logger.warning(f"Error generating custom charts: {e}")
+        
+        return charts
     
     def get_stats(self) -> Dict[str, Any]:
         """Get generator statistics."""

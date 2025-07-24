@@ -14,8 +14,8 @@ from uuid import UUID
 from shared.observability.logging import get_logger
 from shared.observability.metrics import get_metrics
 from shared.observability.tracing import traced
-from shared.event_bus import EventBus
-from shared.config import get_settings
+from shared.events.event_bus import EventBus
+from shared.config.settings import get_settings
 
 from ..models.correlation import (
     CorrelationRule, CorrelationEvent, CorrelationResult, 

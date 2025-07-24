@@ -19,7 +19,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.sql import func
 
-from shared.config.database import get_db_session
+from shared.database.connection import get_db_session
 
 Base = declarative_base()
 
@@ -259,8 +259,9 @@ class CorrelationMetrics(Base):
 # Database initialization
 async def init_db():
     """Initialize database tables."""
-    from shared.config.database import engine
+    from shared.database.connection import get_engine
     
+    engine = get_engine()
     # Create tables
     Base.metadata.create_all(bind=engine)
     
@@ -270,8 +271,9 @@ async def init_db():
 
 async def close_db():
     """Close database connections."""
-    from shared.config.database import engine
+    from shared.database.connection import get_engine
     
+    engine = get_engine()
     if hasattr(engine, 'dispose'):
         engine.dispose()
 

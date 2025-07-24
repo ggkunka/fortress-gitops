@@ -13,14 +13,14 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from shared.config import get_settings
+from shared.config.settings import get_settings
 from shared.observability.logging import get_logger
 from shared.observability.metrics import get_metrics
 from shared.observability.tracing import traced
 from shared.observability.middleware import ObservabilityMiddleware
 from shared.security.headers import SecurityHeadersMiddleware
 from shared.security.rate_limiting import RateLimitingMiddleware
-from shared.event_bus import EventBus
+from shared.events.event_bus import EventBus
 
 from .models import correlation
 from .services.correlation_engine import CorrelationEngine
