@@ -1,0 +1,217 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: authorization-policy
+spec:
+  # Apply to all services in the namespace
+  rules:
+  # Allow ingress gateway to access web and API services
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+  # Allow authenticated users from the same namespace
+  - from:
+    - source:
+        namespaces: ["mcp-security"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    when:
+    - key: request.auth.claims[iss]
+      values: ["https://security.company.com/auth"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-api-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: api-authorization-policy
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-api
+  rules:
+  # Public authentication endpoints
+  - to:
+    - operation:
+        paths: ["/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/forgot-password"]
+        methods: ["POST"]
+  # Authenticated API access
+  - from:
+    - source:
+        principals: ["cluster.local/ns/mcp-security/sa/mcp-security-api"]
+    to:
+    - operation:
+        paths: ["/api/v1/*"]
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    when:
+    - key: request.auth.claims[aud]
+      values: ["mcp-security-api"]
+  # Health check access
+  - to:
+    - operation:
+        paths: ["/health", "/metrics", "/ready"]
+        methods: ["GET"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-web-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: web-authorization-policy
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-web
+  rules:
+  # Allow all access to web UI (authentication handled by the app)
+  - to:
+    - operation:
+        methods: ["GET", "POST"]
+  # Static assets
+  - to:
+    - operation:
+        paths: ["/static/*", "/assets/*", "*.js", "*.css", "*.png", "*.jpg", "*.svg"]
+        methods: ["GET"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-auth-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: auth-authorization-policy
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-auth
+  rules:
+  # Public authentication endpoints
+  - to:
+    - operation:
+        paths: ["/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh"]
+        methods: ["POST"]
+  # Internal service access
+  - from:
+    - source:
+        namespaces: ["mcp-security"]
+    to:
+    - operation:
+        paths: ["/api/v1/auth/*"]
+        methods: ["GET", "POST", "PUT", "PATCH"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-scans-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: scans-authorization-policy
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-scans
+  rules:
+  # Authenticated access required
+  - from:
+    - source:
+        namespaces: ["mcp-security"]
+    to:
+    - operation:
+        paths: ["/api/v1/scans/*"]
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    when:
+    - key: request.auth.claims[scope]
+      values: ["scan:read", "scan:write", "scan:delete"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-admin-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: admin-authorization-policy
+spec:
+  rules:
+  # Admin-only access
+  - from:
+    - source:
+        namespaces: ["mcp-security"]
+    to:
+    - operation:
+        paths: ["/api/v1/admin/*"]
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    when:
+    - key: request.auth.claims[role]
+      values: ["admin", "super_admin"]
+    - key: request.auth.claims[permissions]
+      values: ["admin:all"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-database-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: database-authorization-policy
+spec:
+  selector:
+    matchLabels:
+      app: postgresql
+  rules:
+  # Only allow access from application services
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/mcp-security/sa/mcp-security-api"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-auth"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-scans"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-vulns"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-reports"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-integrations"
+        - "cluster.local/ns/mcp-security/sa/mcp-security-dashboard"
+    to:
+    - operation:
+        ports: ["5432"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-deny-all
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: deny-all-policy
+spec:
+  # Deny access to sensitive paths
+  action: DENY
+  rules:
+  - to:
+    - operation:
+        paths: ["/admin/*", "/debug/*", "/.env", "/config/*"]
+  - when:
+    - key: source.namespace
+      notValues: ["mcp-security", "istio-system"]
+  # Deny access based on suspicious headers
+  - when:
+    - key: request.headers[user-agent]
+      values: ["*bot*", "*crawler*", "*scanner*"]
+  # Rate limiting - deny excessive requests
+  - when:
+    - key: request.headers[x-request-count]
+      values: ["100", "200", "500", "1000"]

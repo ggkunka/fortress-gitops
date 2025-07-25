@@ -1,0 +1,66 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mcp-security-default
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: peer-authentication
+spec:
+  # Enable mTLS for all services in the namespace
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mcp-security-api-pa
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: api-peer-authentication
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-api
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8000:
+      mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mcp-security-web-pa
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: web-peer-authentication
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-web
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    3000:
+      mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mcp-security-database-pa
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: database-peer-authentication
+spec:
+  selector:
+    matchLabels:
+      app: postgresql
+  mtls:
+    mode: PERMISSIVE  # Allow both mTLS and plain text for database
+  portLevelMtls:
+    5432:
+      mode: PERMISSIVE

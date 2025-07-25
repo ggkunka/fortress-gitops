@@ -1,0 +1,158 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-security-metrics
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: telemetry
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        source_service_name:
+          value: "%{SOURCE_SERVICE_NAME | 'unknown'}"
+        source_service_namespace:
+          value: "%{SOURCE_SERVICE_NAMESPACE | 'unknown'}"
+        destination_service_name:
+          value: "%{DESTINATION_SERVICE_NAME | 'unknown'}"
+        destination_service_namespace:
+          value: "%{DESTINATION_SERVICE_NAMESPACE | 'unknown'}"
+        request_protocol:
+          value: "%{REQUEST_PROTOCOL | 'unknown'}"
+        response_code:
+          value: "%{RESPONSE_CODE | '0'}"
+        request_method:
+          value: "%{REQUEST_METHOD | 'unknown'}"
+        user_agent:
+          value: "%{REQUEST_USERAGENT | 'unknown'}"
+        organization_id:
+          value: "%{REQUEST_HEADER_X_ORGANIZATION_ID | 'unknown'}"
+        user_id:
+          value: "%{REQUEST_HEADER_X_USER_ID | 'unknown'}"
+  # Custom metrics
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        metric: requests_total
+      tagOverrides:
+        security_scan_type:
+          value: "%{REQUEST_HEADER_X_SCAN_TYPE | 'unknown'}"
+        vulnerability_severity:
+          value: "%{REQUEST_HEADER_X_VULN_SEVERITY | 'unknown'}"
+        report_type:
+          value: "%{REQUEST_HEADER_X_REPORT_TYPE | 'unknown'}"
+        integration_type:
+          value: "%{REQUEST_HEADER_X_INTEGRATION_TYPE | 'unknown'}"
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-security-tracing
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: tracing-telemetry
+spec:
+  tracing:
+  - providers:
+    - name: jaeger
+  - customTags:
+      organization_id:
+        header:
+          name: "x-organization-id"
+      user_id:
+        header:
+          name: "x-user-id"
+      scan_id:
+        header:
+          name: "x-scan-id"
+      vulnerability_id:
+        header:
+          name: "x-vulnerability-id"
+      report_id:
+        header:
+          name: "x-report-id"
+      integration_id:
+        header:
+          name: "x-integration-id"
+      request_type:
+        header:
+          name: "x-request-type"
+      api_version:
+        header:
+          name: "x-api-version"
+          defaultValue: "v1"
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-security-access-logging
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: access-logging
+spec:
+  accessLogging:
+  - providers:
+    - name: otel
+  - filter:
+      expression: 'response.code >= 400'
+  - format:
+      labels:
+        timestamp: "%START_TIME%"
+        method: "%REQ(:METHOD)%"
+        path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+        protocol: "%PROTOCOL%"
+        response_code: "%RESPONSE_CODE%"
+        response_flags: "%RESPONSE_FLAGS%"
+        bytes_received: "%BYTES_RECEIVED%"
+        bytes_sent: "%BYTES_SENT%"
+        duration: "%DURATION%"
+        upstream_service_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+        x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+        user_agent: "%REQ(USER-AGENT)%"
+        request_id: "%REQ(X-REQUEST-ID)%"
+        authority: "%REQ(:AUTHORITY)%"
+        upstream_host: "%UPSTREAM_HOST%"
+        source_address: "%DOWNSTREAM_REMOTE_ADDRESS%"
+        organization_id: "%REQ(X-ORGANIZATION-ID)%"
+        user_id: "%REQ(X-USER-ID)%"
+        scan_type: "%REQ(X-SCAN-TYPE)%"
+        vulnerability_severity: "%REQ(X-VULN-SEVERITY)%"
+        security_context: "%REQ(X-SECURITY-CONTEXT)%"
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mcp-security-error-logging
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: error-logging
+spec:
+  accessLogging:
+  - providers:
+    - name: otel
+  - filter:
+      expression: 'response.code >= 500 || has(request.headers["x-error-debug"])'
+  - format:
+      labels:
+        error_type: "server_error"
+        timestamp: "%START_TIME%"
+        method: "%REQ(:METHOD)%"
+        path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+        response_code: "%RESPONSE_CODE%"
+        response_flags: "%RESPONSE_FLAGS%"
+        duration: "%DURATION%"
+        user_agent: "%REQ(USER-AGENT)%"
+        request_id: "%REQ(X-REQUEST-ID)%"
+        organization_id: "%REQ(X-ORGANIZATION-ID)%"
+        user_id: "%REQ(X-USER-ID)%"
+        error_message: "%DYNAMIC_METADATA(envoy.common:error_message)%"
+        stack_trace: "%DYNAMIC_METADATA(envoy.common:stack_trace)%"

@@ -1,0 +1,164 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mcp-security-vs
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: virtual-service
+spec:
+  hosts:
+  - "security.company.com"
+  gateways:
+  - mcp-security-gateway
+  http:
+  # API routes
+  - match:
+    - uri:
+        prefix: "/api/v1/"
+    route:
+    - destination:
+        host: mcp-security-api
+        port:
+          number: 8000
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 100ms
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+    timeout: 30s
+  # Web UI routes
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: mcp-security-web
+        port:
+          number: 3000
+    timeout: 15s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mcp-security-api-vs
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: api-virtual-service
+spec:
+  hosts:
+  - "api.security.company.com"
+  gateways:
+  - mcp-security-gateway
+  http:
+  # Authentication routes
+  - match:
+    - uri:
+        prefix: "/api/v1/auth/"
+    route:
+    - destination:
+        host: mcp-security-auth
+        port:
+          number: 8001
+    retries:
+      attempts: 2
+      perTryTimeout: 5s
+    timeout: 10s
+  # Scan service routes
+  - match:
+    - uri:
+        prefix: "/api/v1/scans/"
+    route:
+    - destination:
+        host: mcp-security-scans
+        port:
+          number: 8002
+    retries:
+      attempts: 3
+      perTryTimeout: 30s
+    timeout: 120s
+  # Vulnerability service routes
+  - match:
+    - uri:
+        prefix: "/api/v1/vulnerabilities/"
+    route:
+    - destination:
+        host: mcp-security-vulns
+        port:
+          number: 8003
+    retries:
+      attempts: 2
+      perTryTimeout: 10s
+    timeout: 30s
+  # Reports service routes
+  - match:
+    - uri:
+        prefix: "/api/v1/reports/"
+    route:
+    - destination:
+        host: mcp-security-reports
+        port:
+          number: 8004
+    retries:
+      attempts: 2
+      perTryTimeout: 60s
+    timeout: 300s
+  # Integrations service routes
+  - match:
+    - uri:
+        prefix: "/api/v1/integrations/"
+    route:
+    - destination:
+        host: mcp-security-integrations
+        port:
+          number: 8005
+    retries:
+      attempts: 3
+      perTryTimeout: 15s
+    timeout: 60s
+  # Dashboard service routes
+  - match:
+    - uri:
+        prefix: "/api/v1/dashboard/"
+    route:
+    - destination:
+        host: mcp-security-dashboard
+        port:
+          number: 8006
+    retries:
+      attempts: 2
+      perTryTimeout: 5s
+    timeout: 15s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mcp-security-internal-vs
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: internal-virtual-service
+spec:
+  hosts:
+  - "internal.security.company.com"
+  gateways:
+  - mcp-security-internal-gateway
+  http:
+  # Internal service communication
+  - match:
+    - uri:
+        prefix: "/internal/"
+    route:
+    - destination:
+        host: mcp-security-internal
+        port:
+          number: 8080
+    headers:
+      request:
+        set:
+          x-internal-request: "true"
+    timeout: 30s
