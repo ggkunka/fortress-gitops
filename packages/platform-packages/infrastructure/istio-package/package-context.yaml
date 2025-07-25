@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kptfile.kpt.dev
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  name: istio-service-mesh
+  package-path: platform-packages/infrastructure/istio-package
+  # Package setters for configuration
+  environment: production # {"$kpt-set":"environment"}
+  domain: security.company.com # {"$kpt-set":"domain"}
+  enable_mtls: "true" # {"$kpt-set":"enable_mtls"}
+  enable_tracing: "true" # {"$kpt-set":"enable_tracing"}
+  enable_metrics: "true" # {"$kpt-set":"enable_metrics"}
+  enable_waf: "true" # {"$kpt-set":"enable_waf"}
+  log_level: info # {"$kpt-set":"log_level"}
+  rate_limit_enabled: "true" # {"$kpt-set":"rate_limit_enabled"}
+  # Resource configuration
+  proxy_cpu_requests: 100m # {"$kpt-set":"proxy_cpu_requests"}
+  proxy_memory_requests: 128Mi # {"$kpt-set":"proxy_memory_requests"}
+  proxy_cpu_limits: 200m # {"$kpt-set":"proxy_cpu_limits"}
+  proxy_memory_limits: 256Mi # {"$kpt-set":"proxy_memory_limits"}
+  # Security configuration
+  require_client_certs: "true" # {"$kpt-set":"require_client_certs"}
+  enable_authorization: "true" # {"$kpt-set":"enable_authorization"}
+  tls_min_version: "1.2" # {"$kpt-set":"tls_min_version"}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: package-info
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  description: |
+    Istio service mesh package for MCP Security Platform
+    
+    This package provides:
+    - Istio control plane configuration
+    - Service mesh security policies (mTLS, AuthZ, AuthN)
+    - Traffic management (Gateways, VirtualServices, DestinationRules)
+    - Observability configuration (Telemetry, Tracing)
+    - Web Application Firewall (WAF) with Envoy filters
+    - Rate limiting and circuit breakers
+    
+    Dependencies: None (base infrastructure package)
+    
+    Configuration via setters:
+    - environment: Target environment (development, staging, production)
+    - domain: Base domain for ingress (e.g., security.company.com)
+    - enable_mtls: Enable mutual TLS (true/false)
+    - enable_tracing: Enable distributed tracing (true/false)
+    - enable_metrics: Enable metrics collection (true/false)
+    - log_level: Logging level (debug, info, warn, error)
+  
+  version: "1.0.0"
+  maintainer: "MCP Security Platform Team"
+  repository: "https://github.com/ggkunka/mcp-security-platform"

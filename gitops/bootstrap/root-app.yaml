@@ -1,0 +1,140 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-security-platform-root
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mcp-security-platform-root
+    app.kubernetes.io/part-of: mcp-security-platform
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+  info:
+  - name: Description
+    value: "Root application for MCP Security Platform using app-of-apps pattern"
+  - name: Repository
+    value: "https://github.com/ggkunka/mcp-security-platform"
+  - name: Environment
+    value: "production"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mcp-security-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mcp-security-platform-project
+    app.kubernetes.io/part-of: mcp-security-platform
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "MCP Security Platform Project"
+  sourceRepos:
+  - 'https://github.com/ggkunka/mcp-security-platform.git'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://prometheus-community.github.io/helm-charts'
+  - 'https://grafana.github.io/helm-charts'
+  - 'https://jaegertracing.github.io/helm-charts'
+  - 'https://kiali.org/helm-charts'
+  destinations:
+  - namespace: 'mcp-security*'
+    server: https://kubernetes.default.svc
+  - namespace: 'istio-system'
+    server: https://kubernetes.default.svc
+  - namespace: 'monitoring'
+    server: https://kubernetes.default.svc
+  - namespace: 'argocd'
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: ''
+    kind: ClusterRole
+  - group: ''
+    kind: ClusterRoleBinding
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  - group: 'apiextensions.k8s.io'
+    kind: CustomResourceDefinition
+  - group: 'networking.istio.io'
+    kind: '*'
+  - group: 'security.istio.io'
+    kind: '*'
+  - group: 'install.istio.io'
+    kind: '*'
+  - group: 'config.istio.io'
+    kind: '*'
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: 'apps'
+    kind: '*'
+  - group: 'networking.k8s.io'
+    kind: '*'
+  - group: 'extensions'
+    kind: '*'
+  - group: 'rbac.authorization.k8s.io'
+    kind: '*'
+  - group: 'networking.istio.io'
+    kind: '*'
+  - group: 'security.istio.io'
+    kind: '*'
+  - group: 'config.istio.io'
+    kind: '*'
+  - group: 'telemetry.istio.io'
+    kind: '*'
+  roles:
+  - name: admin
+    description: "Full access to MCP Security Platform"
+    policies:
+    - p, proj:mcp-security-platform:admin, applications, *, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:admin, repositories, *, *, allow
+    - p, proj:mcp-security-platform:admin, logs, get, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:admin, exec, create, mcp-security-platform/*, allow
+    groups:
+    - mcp-admins
+  - name: developer
+    description: "Application management access"
+    policies:
+    - p, proj:mcp-security-platform:developer, applications, get, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, applications, create, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, applications, update, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, applications, delete, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, applications, sync, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:developer, logs, get, mcp-security-platform/*, allow
+    groups:
+    - mcp-developers
+  - name: readonly
+    description: "Read-only access"
+    policies:
+    - p, proj:mcp-security-platform:readonly, applications, get, mcp-security-platform/*, allow
+    - p, proj:mcp-security-platform:readonly, logs, get, mcp-security-platform/*, allow
+    groups:
+    - mcp-security
+    - mcp-users

@@ -1,0 +1,170 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/component: mcp-protocol
+    app.kubernetes.io/part-of: mcp-security-platform
+    app.kubernetes.io/version: v1.0.0 # kpt-set: ${image_tag}
+    kpt.dev/package: mcp-server-service
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/core-services/mcp-server-package
+spec:
+  replicas: 3 # kpt-set: ${replicas}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mcp-server
+      app.kubernetes.io/instance: mcp-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mcp-server
+        app.kubernetes.io/instance: mcp-server
+        app.kubernetes.io/component: mcp-protocol
+        app.kubernetes.io/part-of: mcp-security-platform
+        app.kubernetes.io/version: v1.0.0 # kpt-set: ${image_tag}
+      annotations:
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        runAsNonRoot: true
+      serviceAccountName: mcp-server
+      containers:
+      - name: mcp-server
+        image: security.company.com/registry/mcp-server:v1.0.0 # kpt-set: ${image_registry}/mcp-server:${image_tag}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        env:
+        - name: ENVIRONMENT
+          value: production # kpt-set: ${environment}
+        - name: LOG_LEVEL
+          value: info # kpt-set: ${log_level}
+        - name: ENABLE_DEBUG
+          value: "false" # kpt-set: ${enable_debug}
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-config
+              key: database_url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-config
+              key: redis_url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-config
+              key: jwt_secret
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-config
+              key: api_key
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: mcp
+          containerPort: 3000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 200m # kpt-set: ${cpu_requests}
+            memory: 512Mi # kpt-set: ${memory_requests}
+          limits:
+            cpu: 1000m # kpt-set: ${cpu_limits}
+            memory: 1Gi # kpt-set: ${memory_limits}
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/component: mcp-protocol
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: mcp-server-service
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/core-services/mcp-server-package
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: mcp
+    port: 3000
+    targetPort: mcp
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/instance: mcp-server
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-server
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/component: mcp-protocol
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: mcp-server-service
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/core-services/mcp-server-package
+automountServiceAccountToken: true

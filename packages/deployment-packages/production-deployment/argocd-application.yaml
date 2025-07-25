@@ -1,0 +1,144 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-security-platform-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: argocd-application
+    app.kubernetes.io/part-of: mcp-security-platform
+    environment: production
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/managed: "true"
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: packages/deployment-packages/production-deployment
+    plugin:
+      name: kpt
+      env:
+      # Global configuration
+      - name: KPT_FN_CONFIG_ENVIRONMENT
+        value: production
+      - name: KPT_FN_CONFIG_DOMAIN
+        value: security.company.com
+      - name: KPT_FN_CONFIG_IMAGE_REGISTRY
+        value: security.company.com/registry
+      - name: KPT_FN_CONFIG_IMAGE_TAG
+        value: v1.0.0
+      
+      # Production scaling
+      - name: KPT_FN_CONFIG_REPLICAS
+        value: "3"
+      - name: KPT_FN_CONFIG_HIGH_AVAILABILITY
+        value: "true"
+      - name: KPT_FN_CONFIG_ENABLE_BACKUPS
+        value: "true"
+      
+      # Security settings
+      - name: KPT_FN_CONFIG_ENABLE_MTLS
+        value: "true"
+      - name: KPT_FN_CONFIG_ENABLE_AUTHORIZATION
+        value: "true"
+      - name: KPT_FN_CONFIG_ENABLE_TRACING
+        value: "true"
+      - name: KPT_FN_CONFIG_ENABLE_METRICS
+        value: "true"
+      - name: KPT_FN_CONFIG_ENABLE_WAF
+        value: "true"
+      
+      # Resource configuration
+      - name: KPT_FN_CONFIG_STORAGE_CLASS
+        value: fast-ssd
+      - name: KPT_FN_CONFIG_POSTGRESQL_STORAGE_SIZE
+        value: 200Gi
+      - name: KPT_FN_CONFIG_REDIS_STORAGE_SIZE
+        value: 50Gi
+      
+      # Database scaling
+      - name: KPT_FN_CONFIG_POSTGRESQL_REPLICAS
+        value: "2"
+      - name: KPT_FN_CONFIG_POSTGRESQL_CPU_REQUESTS
+        value: 1000m
+      - name: KPT_FN_CONFIG_POSTGRESQL_MEMORY_REQUESTS
+        value: 2Gi
+      
+      # Monitoring
+      - name: KPT_FN_CONFIG_LOG_LEVEL
+        value: info
+      - name: KPT_FN_CONFIG_METRICS_RETENTION
+        value: 30d
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - ServerSideApply=true
+    - ApplyOutOfSyncOnly=true
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/name: mcp-security-platform
+        app.kubernetes.io/managed-by: argocd
+        istio-injection: enabled
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+  info:
+  - name: Description
+    value: "Production deployment of MCP Security Platform using kpt packages"
+  - name: Environment
+    value: "Production"
+  - name: Domain
+    value: "security.company.com"
+  - name: Repository
+    value: "https://github.com/ggkunka/mcp-security-platform"
+  - name: Package Path
+    value: "packages/deployment-packages/production-deployment"
+  - name: Deployment Type
+    value: "kpt Package-based"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-security-argocd-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-config
+    app.kubernetes.io/component: argocd-configuration
+    app.kubernetes.io/part-of: mcp-security-platform
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/bootstrap/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  info:
+  - name: Description
+    value: "ArgoCD configuration and RBAC for MCP Security Platform"

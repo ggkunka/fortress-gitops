@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kptfile.kpt.dev
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  name: databases-infrastructure
+  package-path: platform-packages/infrastructure/databases-package
+  # Package setters for configuration
+  environment: production # {"$kpt-set":"environment"}
+  # PostgreSQL configuration
+  postgresql_replicas: "1" # {"$kpt-set":"postgresql_replicas"}
+  postgresql_storage_size: 100Gi # {"$kpt-set":"postgresql_storage_size"}
+  postgresql_cpu_requests: 500m # {"$kpt-set":"postgresql_cpu_requests"}
+  postgresql_memory_requests: 1Gi # {"$kpt-set":"postgresql_memory_requests"}
+  postgresql_cpu_limits: 2000m # {"$kpt-set":"postgresql_cpu_limits"}
+  postgresql_memory_limits: 4Gi # {"$kpt-set":"postgresql_memory_limits"}
+  postgresql_database: mcp_security # {"$kpt-set":"postgresql_database"}
+  postgresql_username: mcp_user # {"$kpt-set":"postgresql_username"}
+  # Redis configuration  
+  redis_replicas: "1" # {"$kpt-set":"redis_replicas"}
+  redis_storage_size: 20Gi # {"$kpt-set":"redis_storage_size"}
+  redis_cpu_requests: 100m # {"$kpt-set":"redis_cpu_requests"}
+  redis_memory_requests: 256Mi # {"$kpt-set":"redis_memory_requests"}
+  redis_cpu_limits: 500m # {"$kpt-set":"redis_cpu_limits"}
+  redis_memory_limits: 1Gi # {"$kpt-set":"redis_memory_limits"}
+  redis_max_memory: 1gb # {"$kpt-set":"redis_max_memory"}
+  # Storage configuration
+  storage_class: fast-ssd # {"$kpt-set":"storage_class"}
+  # Backup configuration
+  enable_backups: "true" # {"$kpt-set":"enable_backups"}
+  backup_retention_days: "30" # {"$kpt-set":"backup_retention_days"}
+  # Monitoring configuration
+  enable_monitoring: "true" # {"$kpt-set":"enable_monitoring"}
+  metrics_port: "9187" # {"$kpt-set":"metrics_port"}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: package-info
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  description: |
+    Database infrastructure package for MCP Security Platform
+    
+    This package provides:
+    - PostgreSQL primary database with optimized configuration
+    - Redis for caching and event bus
+    - Database schema migrations
+    - Backup and recovery configurations
+    - Monitoring and metrics collection
+    - Security policies and network isolation
+    
+    Dependencies: None (base infrastructure package)
+    
+    Configuration via setters:
+    - environment: Target environment (development, staging, production)
+    - postgresql_replicas: Number of PostgreSQL replicas
+    - postgresql_storage_size: Storage allocation for PostgreSQL
+    - postgresql_*_requests/limits: Resource allocation
+    - redis_replicas: Number of Redis replicas
+    - redis_storage_size: Storage allocation for Redis
+    - storage_class: Kubernetes storage class to use
+    - enable_backups: Enable automated backups (true/false)
+    - enable_monitoring: Enable metrics collection (true/false)
+  
+  version: "1.0.0"
+  maintainer: "MCP Security Platform Team"
+  repository: "https://github.com/ggkunka/mcp-security-platform"

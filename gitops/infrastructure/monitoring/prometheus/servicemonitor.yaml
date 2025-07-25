@@ -1,0 +1,86 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mcp-security-services
+  namespace: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: mcp-security-servicemonitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: mcp-security-platform
+  namespaceSelector:
+    matchNames:
+    - mcp-security
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+  - port: http-monitoring
+    interval: 30s
+    path: /metrics
+    scheme: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: istio-proxy
+  namespace: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: istio-proxy-servicemonitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: istio-proxy
+  namespaceSelector:
+    any: true
+  endpoints:
+  - port: http-monitoring
+    interval: 15s
+    path: /stats/prometheus
+    scheme: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgresql
+  namespace: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: postgresql-servicemonitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  namespaceSelector:
+    matchNames:
+    - mcp-security
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis
+  namespace: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: redis-servicemonitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  namespaceSelector:
+    matchNames:
+    - mcp-security
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http

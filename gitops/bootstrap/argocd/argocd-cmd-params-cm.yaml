@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Server configuration
+  server.insecure: "false"
+  server.grpc.web: "true"
+  server.enable.proxy.extension: "true"
+  
+  # Application controller configuration
+  application.controller.operation.processors: "20"
+  application.controller.status.processors: "20"
+  application.controller.repo.server.timeout.seconds: "300"
+  
+  # Repository server configuration
+  reposerver.parallelism.limit: "10"
+  
+  # Redis configuration
+  redis.server: "argocd-redis:6379"
+  
+  # Security settings
+  server.rbac.log.enforce.enable: "true"
+  server.session.max.duration: "24h"
+  server.session.failure.max.duration: "1h"
+  
+  # Performance tuning
+  controller.sharding.algorithm: "round-robin"
+  controller.status.processors: "20"
+  controller.operation.processors: "10"
+  
+  # Logging
+  application.controller.log.level: "info"
+  server.log.level: "info"
+  reposerver.log.level: "info"

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: monitoring-namespace
+    app.kubernetes.io/part-of: mcp-security-platform
+    istio-injection: enabled
+  annotations:
+    argocd.argoproj.io/managed: "true"

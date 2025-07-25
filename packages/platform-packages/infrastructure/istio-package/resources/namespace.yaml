@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-namespace
+    app.kubernetes.io/part-of: mcp-security-platform
+    istio-injection: enabled
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+    argocd.argoproj.io/managed: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: monitoring-namespace
+    app.kubernetes.io/part-of: mcp-security-platform
+    istio-injection: enabled
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+    argocd.argoproj.io/managed: "true"

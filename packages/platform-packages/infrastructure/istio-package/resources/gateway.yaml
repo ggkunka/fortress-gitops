@@ -1,0 +1,63 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: mcp-security-gateway
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-gateway
+    app.kubernetes.io/component: ingress-gateway
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: mcp-security-tls
+    hosts:
+    - "DOMAIN_PLACEHOLDER" # kpt-set: ${domain}
+    - "api.DOMAIN_PLACEHOLDER" # kpt-set: api.${domain}
+    - "argocd.DOMAIN_PLACEHOLDER" # kpt-set: argocd.${domain}
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "DOMAIN_PLACEHOLDER" # kpt-set: ${domain}
+    - "api.DOMAIN_PLACEHOLDER" # kpt-set: api.${domain}
+    - "argocd.DOMAIN_PLACEHOLDER" # kpt-set: argocd.${domain}
+    tls:
+      httpsRedirect: true
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: mcp-security-internal-gateway
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-internal-gateway
+    app.kubernetes.io/component: internal-gateway
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 8443
+      name: https-internal
+      protocol: HTTPS
+    tls:
+      mode: ISTIO_MUTUAL
+    hosts:
+    - "*"

@@ -1,0 +1,124 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: monitoring-stack
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security-monitoring
+
+resources:
+# Namespace and base configuration
+- namespace.yaml
+# Prometheus stack
+- prometheus/prometheus.yaml
+- prometheus/servicemonitor.yaml
+- prometheus/alertmanager.yaml
+# Grafana dashboards
+- grafana/grafana.yaml
+- grafana/dashboards.yaml
+# Jaeger tracing
+- jaeger/jaeger.yaml
+# Kiali service mesh observability
+- kiali/kiali.yaml
+
+# Helm charts for complex components
+helmCharts:
+- name: kube-prometheus-stack
+  repo: https://prometheus-community.github.io/helm-charts
+  version: "51.0.0"
+  releaseName: prometheus
+  namespace: mcp-security-monitoring
+  valuesInline:
+    prometheus:
+      prometheusSpec:
+        retention: 30d
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: fast-ssd
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 100Gi
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+    grafana:
+      adminPassword: admin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      persistence:
+        enabled: true
+        storageClassName: fast-ssd
+        size: 10Gi
+    alertmanager:
+      alertmanagerSpec:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+- name: jaeger
+  repo: https://jaegertracing.github.io/helm-charts
+  version: "0.71.0"
+  releaseName: jaeger
+  namespace: mcp-security-monitoring
+  valuesInline:
+    provisionDataStore:
+      cassandra: false
+      elasticsearch: true
+    elasticsearch:
+      replicas: 1
+      minimumMasterNodes: 1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+- name: kiali-server
+  repo: https://kiali.org/helm-charts
+  version: "1.73.0"
+  releaseName: kiali
+  namespace: mcp-security-monitoring
+  valuesInline:
+    auth:
+      strategy: anonymous
+    external_services:
+      prometheus:
+        url: "http://prometheus-kube-prometheus-prometheus:9090"
+      grafana:
+        url: "http://prometheus-grafana:80"
+      jaeger:
+        url: "http://jaeger-query:16686"
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/name: monitoring-stack
+  app.kubernetes.io/part-of: mcp-security-platform
+  app.kubernetes.io/managed-by: argocd
+
+# Configuration
+configMapGenerator:
+- name: monitoring-config
+  literals:
+  - PROMETHEUS_RETENTION=30d
+  - GRAFANA_ADMIN_PASSWORD=admin
+  - JAEGER_STORAGE=elasticsearch
+  - KIALI_AUTH=anonymous

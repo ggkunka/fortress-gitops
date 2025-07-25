@@ -1,0 +1,78 @@
+apiVersion: kpt.dev/v1
+kind: Kptfile
+metadata:
+  name: mcp-server-service
+  annotations:
+    config.kubernetes.io/local-config: "true"
+info:
+  description: "MCP protocol server package for MCP Security Platform"
+  keywords:
+  - mcp
+  - anthropic
+  - server
+  - security-tools
+  site: https://github.com/ggkunka/mcp-security-platform
+upstream:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/core-services/mcp-server-package
+    ref: main
+upstreamLock:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/core-services/mcp-server-package
+    ref: main
+    commit: HEAD
+dependencies:
+- name: databases
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/infrastructure/databases-package
+      ref: main
+  strategy: resource-merge
+pipeline:
+  mutators:
+  # Apply environment-specific setters
+  - image: gcr.io/kpt-fn/apply-setters:v0.2.0
+    configMap:
+      environment: production # kpt-set: ${environment}
+      image_registry: security.company.com/registry # kpt-set: ${image_registry}
+      image_tag: v1.0.0 # kpt-set: ${image_tag}
+      replicas: "3" # kpt-set: ${replicas}
+      cpu_requests: 200m # kpt-set: ${cpu_requests}
+      memory_requests: 512Mi # kpt-set: ${memory_requests}
+      cpu_limits: 1000m # kpt-set: ${cpu_limits}
+      memory_limits: 1Gi # kpt-set: ${memory_limits}
+      log_level: info # kpt-set: ${log_level}
+      enable_debug: "false" # kpt-set: ${enable_debug}
+  # Update image tags
+  - image: gcr.io/kpt-fn/set-image:v0.1.0
+    configMap:
+      name: mcp-server
+      newImage: security.company.com/registry/mcp-server # kpt-set: ${image_registry}/mcp-server
+      newTag: v1.0.0 # kpt-set: ${image_tag}
+  validators:
+  # Validate Kubernetes resources
+  - image: gcr.io/kpt-fn/kubeval:v0.3.0
+    configMap:
+      strict: "true"
+  # Validate MCP server configuration
+  - image: security.company.com/kpt-functions/mcp-validator:v1.0.0
+    configMap:
+      require_tools: "network_scanner,vulnerability_scanner,port_scanner,service_analyzer"
+      require_database_connection: "true"
+      validate_security_config: "true"
+  # Security validation
+  - image: security.company.com/kpt-functions/security-validator:v1.0.0
+    configMap:
+      require_non_root: "true"
+      require_read_only_fs: "true"
+      require_resource_limits: "true"
+inventory:
+  namespace: mcp-security
+  name: mcp-server-package-inventory
+  inventoryID: mcp-server-service

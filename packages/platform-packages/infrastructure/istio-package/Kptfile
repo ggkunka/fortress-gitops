@@ -1,0 +1,65 @@
+apiVersion: kpt.dev/v1
+kind: Kptfile
+metadata:
+  name: istio-service-mesh
+  annotations:
+    config.kubernetes.io/local-config: "true"
+info:
+  description: "Istio service mesh package for MCP Security Platform"
+  keywords:
+  - istio
+  - service-mesh
+  - security
+  - traffic-management
+  site: https://github.com/ggkunka/mcp-security-platform
+upstream:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/infrastructure/istio-package
+    ref: main
+upstreamLock:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/infrastructure/istio-package
+    ref: main
+    commit: HEAD
+pipeline:
+  mutators:
+  # Apply environment-specific setters
+  - image: gcr.io/kpt-fn/apply-setters:v0.2.0
+    configMap:
+      environment: production # kpt-set: ${environment}
+      domain: security.company.com # kpt-set: ${domain}
+      enable_mtls: "true" # kpt-set: ${enable_mtls}
+      enable_tracing: "true" # kpt-set: ${enable_tracing}
+      enable_metrics: "true" # kpt-set: ${enable_metrics}
+      log_level: info # kpt-set: ${log_level}
+  # Substitute values in resources
+  - image: gcr.io/kpt-fn/substitute:v0.2.0
+    configMap:
+      pattern: "DOMAIN_PLACEHOLDER"
+      replacement: "security.company.com" # kpt-set: ${domain}
+  validators:
+  # Validate Kubernetes resources
+  - image: gcr.io/kpt-fn/kubeval:v0.3.0
+    configMap:
+      strict: "true"
+      ignore_missing_schemas: "true"
+  # Validate Istio configurations
+  - image: security.company.com/kpt-functions/istio-validator:v1.0.0
+    configMap:
+      require_mtls: "true" # kpt-set: ${enable_mtls}
+      require_authz_policies: "true"
+      validate_gateways: "true"
+  # Security policy validation
+  - image: security.company.com/kpt-functions/security-validator:v1.0.0
+    configMap:
+      strict_mode: "true"
+      require_network_policies: "true"
+      require_pod_security_context: "true"
+inventory:
+  namespace: istio-system
+  name: istio-package-inventory
+  inventoryID: istio-service-mesh

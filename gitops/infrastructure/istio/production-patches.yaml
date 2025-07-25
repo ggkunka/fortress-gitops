@@ -1,0 +1,28 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: mcp-security-gateway
+  namespace: mcp-security
+spec:
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: mcp-security-tls
+    hosts:
+    - "security.company.com"
+    - "api.security.company.com"
+    - "argocd.security.company.com"
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "security.company.com"
+    - "api.security.company.com"
+    - "argocd.security.company.com"
+    tls:
+      httpsRedirect: true

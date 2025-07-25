@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-configuration
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: redis-config
+    app.kubernetes.io/component: database
+data:
+  redis.conf: |
+    # Redis configuration for MCP Security Platform
+    
+    # Memory management
+    maxmemory 1gb
+    maxmemory-policy allkeys-lru
+    
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    # Security
+    requirepass SecureRedisPassword123!
+    
+    # Networking
+    tcp-keepalive 60
+    timeout 0
+    
+    # Logging
+    loglevel notice
+    
+    # Performance
+    tcp-backlog 511
+    databases 16
+    
+    # Pub/Sub for event bus
+    notify-keyspace-events Ex
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: redis-credentials
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  redis-password: "SecureRedisPassword123!"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: tcp-redis
+    port: 6379
+    targetPort: tcp-redis
+  - name: metrics
+    port: 9121
+    targetPort: metrics
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis

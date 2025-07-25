@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-init-scripts
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: postgresql-init
+    app.kubernetes.io/component: database
+data:
+  01-create-extensions.sql: |
+    -- Enable required PostgreSQL extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+    CREATE EXTENSION IF NOT EXISTS "btree_gin";
+    CREATE EXTENSION IF NOT EXISTS "btree_gist";
+  
+  02-create-schemas.sql: |
+    -- Create application schemas
+    CREATE SCHEMA IF NOT EXISTS auth;
+    CREATE SCHEMA IF NOT EXISTS security;
+    CREATE SCHEMA IF NOT EXISTS reporting;
+    CREATE SCHEMA IF NOT EXISTS integrations;
+    CREATE SCHEMA IF NOT EXISTS plugins;
+    
+    -- Grant permissions
+    GRANT USAGE ON SCHEMA auth TO mcp_user;
+    GRANT USAGE ON SCHEMA security TO mcp_user;
+    GRANT USAGE ON SCHEMA reporting TO mcp_user;
+    GRANT USAGE ON SCHEMA integrations TO mcp_user;
+    GRANT USAGE ON SCHEMA plugins TO mcp_user;
+    
+    GRANT CREATE ON SCHEMA auth TO mcp_user;
+    GRANT CREATE ON SCHEMA security TO mcp_user;
+    GRANT CREATE ON SCHEMA reporting TO mcp_user;
+    GRANT CREATE ON SCHEMA integrations TO mcp_user;
+    GRANT CREATE ON SCHEMA plugins TO mcp_user;
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-credentials
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: postgresql-credentials
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  postgres-password: "SecurePassword123!"
+  password: "SecureUserPassword123!"
+  username: "mcp_user"
+  database: "mcp_security"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-headless
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: tcp-postgresql
+    port: 5432
+    targetPort: tcp-postgresql
+  - name: metrics
+    port: 9187
+    targetPort: metrics
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql
