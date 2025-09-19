@@ -18,36 +18,32 @@ spec:
     spec:
       containers:
       - name: kafka
-        image: confluentinc/cp-kafka:7.4.0
+        image: bitnami/kafka:3.6
         ports:
         - containerPort: 9092
         env:
-        - name: KAFKA_BROKER_ID
-          value: "1"
-        - name: KAFKA_ZOOKEEPER_CONNECT
+        - name: KAFKA_CFG_ZOOKEEPER_CONNECT
           value: "zookeeper:2181"
-        - name: KAFKA_ADVERTISED_LISTENERS
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
           value: "PLAINTEXT://kafka:9092"
-        - name: KAFKA_LISTENERS
+        - name: KAFKA_CFG_LISTENERS
           value: "PLAINTEXT://0.0.0.0:9092"
-        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+        - name: KAFKA_CFG_BROKER_ID
           value: "1"
-        - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+        - name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "1"
+        - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
           value: "true"
-        - name: KAFKA_LOG_RETENTION_HOURS
+        - name: KAFKA_CFG_LOG_RETENTION_HOURS
           value: "24"
-        - name: KAFKA_NUM_PARTITIONS
+        - name: KAFKA_CFG_NUM_PARTITIONS
           value: "3"
-        - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+        - name: KAFKA_CFG_DEFAULT_REPLICATION_FACTOR
           value: "1"
-        - name: KAFKA_MIN_INSYNC_REPLICAS
+        - name: KAFKA_CFG_MIN_INSYNC_REPLICAS
           value: "1"
-        - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
-          value: "0"
-        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
-          value: "1"
-        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-          value: "1"
+        - name: ALLOW_PLAINTEXT_LISTENER
+          value: "yes"
         resources:
           requests:
             memory: "512Mi"
@@ -56,20 +52,14 @@ spec:
             memory: "1Gi"
             cpu: "500m"
         livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - "kafka-broker-api-versions --bootstrap-server localhost:9092"
-          initialDelaySeconds: 90
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 60
           periodSeconds: 30
         readinessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - "kafka-broker-api-versions --bootstrap-server localhost:9092"
-          initialDelaySeconds: 60
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 30
           periodSeconds: 10
 ---
 apiVersion: apps/v1
@@ -92,13 +82,15 @@ spec:
     spec:
       containers:
       - name: zookeeper
-        image: confluentinc/cp-zookeeper:7.4.0
+        image: bitnami/zookeeper:3.9
         ports:
         - containerPort: 2181
         env:
-        - name: ZOOKEEPER_CLIENT_PORT
+        - name: ALLOW_ANONYMOUS_LOGIN
+          value: "yes"
+        - name: ZOO_PORT_NUMBER
           value: "2181"
-        - name: ZOOKEEPER_TICK_TIME
+        - name: ZOO_TICK_TIME
           value: "2000"
         resources:
           requests:
