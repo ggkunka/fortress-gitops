@@ -168,7 +168,7 @@ spec:
   source:
     repoURL: https://github.com/ggkunka/mcp-security-platform.git
     targetRevision: HEAD
-    path: gitops/infrastructure/event-bus
+    path: gitops/infrastructure/simple-kafka
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp-security
@@ -186,7 +186,7 @@ spec:
         maxDuration: 3m
   info:
   - name: Description
-    value: "Apache Kafka event bus for event-driven architecture"
+    value: "Simple Kafka deployment for event-driven architecture"
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
