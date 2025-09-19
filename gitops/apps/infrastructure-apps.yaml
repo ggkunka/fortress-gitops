@@ -65,8 +65,8 @@ spec:
         primary:
           persistence:
             enabled: true
-            size: 100Gi
-            storageClass: ""
+            size: 10Gi
+            storageClass: "local-path"
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp-security
