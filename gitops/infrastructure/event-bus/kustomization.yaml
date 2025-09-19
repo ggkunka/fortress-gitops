@@ -19,26 +19,3 @@ labels:
     app.kubernetes.io/part-of: mcp-security-platform
     app.kubernetes.io/component: messaging
     app.kubernetes.io/managed-by: argocd
-
-# Add server-id annotations for StatefulSet pods
-patchesJson6902:
-- target:
-    group: apps
-    version: v1
-    kind: StatefulSet
-    name: zookeeper
-  patch: |-
-    - op: add
-      path: /spec/template/metadata/annotations
-      value:
-        zookeeper.apache.org/server-id: "1"
-- target:
-    group: apps
-    version: v1
-    kind: StatefulSet
-    name: kafka
-  patch: |-
-    - op: add
-      path: /spec/template/metadata/annotations
-      value:
-        kafka.apache.org/broker-id: "1"
