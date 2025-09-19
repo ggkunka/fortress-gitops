@@ -1,0 +1,101 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-platform-core
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mcp-platform-core
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: core-services
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: deployments/helm/mcp-platform
+    helm:
+      releaseName: mcp-platform
+      values: |-
+        global:
+          imageRegistry: "ghcr.io"
+          imageNamespace: "ggkunka"
+          storageClass: "local-path"
+        
+        # Disable external dependencies since we already have them
+        redis:
+          enabled: false
+        postgresql:
+          enabled: false
+        
+        # Enable monitoring
+        monitoring:
+          prometheus:
+            enabled: false
+          grafana:
+            enabled: false
+        
+        # Enable core services
+        services:
+          ingestion:
+            enabled: true
+          enrichment:
+            enabled: true
+          analysis:
+            enabled: true
+          notification:
+            enabled: true
+          auth:
+            enabled: true
+          gateway:
+            enabled: true
+        
+        # Override database connections to use our deployed PostgreSQL
+        ingestion:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+        
+        enrichment:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+        
+        analysis:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+        
+        notification:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+        
+        auth:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+        
+        gateway:
+          env:
+            DATABASE_URL: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+            REDIS_URL: "redis://redis-master:6379/0"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "MCP Security Platform core services (Auth, Gateway, Ingestion, Enrichment, Analysis, Notification)"
