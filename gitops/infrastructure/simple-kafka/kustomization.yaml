@@ -9,7 +9,7 @@ metadata:
 namespace: mcp-security
 
 resources:
-- kafka-simple.yaml
+- kafka-minimal.yaml
 
 labels:
 - pairs:
