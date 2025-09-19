@@ -10,9 +10,6 @@ namespace: mcp-security-monitoring
 
 resources:
 - namespace.yaml
-- prometheus/prometheus.yaml
-- prometheus/servicemonitor.yaml
-- prometheus/alertmanager.yaml
 
 labels:
 - pairs:
