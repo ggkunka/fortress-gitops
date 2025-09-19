@@ -223,3 +223,39 @@ spec:
   info:
   - name: Description
     value: "Prometheus and Grafana monitoring stack"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: search-analytics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: search-analytics
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: search
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/search-analytics
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Elasticsearch for search and analytics"
