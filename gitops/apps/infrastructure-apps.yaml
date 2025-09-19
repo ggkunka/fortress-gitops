@@ -1,39 +1,3 @@
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: istio-system
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: istio-system
-    app.kubernetes.io/part-of: infrastructure
-    app.kubernetes.io/component: service-mesh
-  finalizers:
-  - resources-finalizer.argocd.argoproj.io
-spec:
-  project: mcp-security-platform
-  source:
-    repoURL: https://github.com/ggkunka/mcp-security-platform.git
-    targetRevision: HEAD
-    path: gitops/infrastructure/istio
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: istio-system
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-    - CreateNamespace=true
-    - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-  info:
-  - name: Description
-    value: "Istio service mesh for MCP Security Platform"
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -80,14 +44,29 @@ metadata:
     app.kubernetes.io/name: databases
     app.kubernetes.io/part-of: infrastructure
     app.kubernetes.io/component: data-layer
+  annotations:
+    argocd.argoproj.io/kustomize-build-options: --enable-helm
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
   project: mcp-security-platform
   source:
-    repoURL: https://github.com/ggkunka/mcp-security-platform.git
-    targetRevision: HEAD
-    path: gitops/infrastructure/databases
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: postgresql
+    targetRevision: 12.10.0
+    helm:
+      releaseName: postgresql
+      values: |-
+        auth:
+          username: mcp_user
+          password: SecureUserPassword123!
+          postgresPassword: SecurePassword123!
+          database: mcp_security
+        primary:
+          persistence:
+            enabled: true
+            size: 100Gi
+            storageClass: ""
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp-security
