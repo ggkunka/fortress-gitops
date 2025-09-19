@@ -429,3 +429,111 @@ spec:
   info:
   - name: Description
     value: "CI/CD pipeline security integration"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: siem-integration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: siem-integration
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: external-integration
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/siem-integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "SIEM integration for security event forwarding"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zero-trust-security
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: zero-trust-security
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: security
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/zero-trust-security
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Zero Trust security architecture with policy enforcement"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-engine
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ml-engine
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/ml-engine
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "AI/ML engine for intelligent threat detection"
