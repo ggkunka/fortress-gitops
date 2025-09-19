@@ -279,6 +279,7 @@ spec:
     path: gitops/infrastructure/service-mesh
   destination:
     server: https://kubernetes.default.svc
+    namespace: istio-system
   syncPolicy:
     automated:
       prune: true
