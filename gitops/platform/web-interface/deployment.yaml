@@ -1,0 +1,284 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-interface
+  labels:
+    app: web-interface
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-interface
+  template:
+    metadata:
+      labels:
+        app: web-interface
+        component: frontend
+    spec:
+      containers:
+      - name: web-interface
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        env:
+        - name: SERVICE_NAME
+          value: "web-interface"
+        - name: API_GATEWAY_URL
+          value: "http://gateway-service:8081"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service:8080"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: web-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: web-interface-nginx-config
+      - name: web-content
+        configMap:
+          name: web-interface-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-interface
+  labels:
+    app: web-interface
+    component: frontend
+spec:
+  selector:
+    app: web-interface
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-interface-nginx-config
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        location /api/ {
+            proxy_pass http://gateway-service:8081/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /auth/ {
+            proxy_pass http://auth-service:8080/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-interface-content
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MCP Security Platform</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 2rem;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 3rem;
+            }
+            .header h1 {
+                font-size: 3rem;
+                margin-bottom: 0.5rem;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }
+            .header p {
+                font-size: 1.2rem;
+                opacity: 0.9;
+            }
+            .services-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 2rem;
+                margin-bottom: 3rem;
+            }
+            .service-card {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                padding: 1.5rem;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                transition: transform 0.3s ease;
+            }
+            .service-card:hover {
+                transform: translateY(-5px);
+            }
+            .service-card h3 {
+                margin-top: 0;
+                color: #fff;
+                font-size: 1.3rem;
+            }
+            .service-card p {
+                opacity: 0.8;
+                line-height: 1.6;
+            }
+            .status {
+                display: inline-block;
+                padding: 0.3rem 0.8rem;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                font-weight: bold;
+                background: #4CAF50;
+                color: white;
+            }
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-top: 2rem;
+            }
+            .stat-card {
+                background: rgba(255, 255, 255, 0.15);
+                padding: 1rem;
+                border-radius: 8px;
+                text-align: center;
+            }
+            .stat-number {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+            .footer {
+                text-align: center;
+                margin-top: 3rem;
+                opacity: 0.7;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🛡️ MCP Security Platform</h1>
+                <p>Comprehensive Security Assessment & Vulnerability Management</p>
+                <span class="status">🟢 OPERATIONAL</span>
+            </div>
+            
+            <div class="services-grid">
+                <div class="service-card">
+                    <h3>🔐 Authentication Service</h3>
+                    <p>Secure user authentication and authorization management for the platform.</p>
+                    <span class="status">Running on :8080</span>
+                </div>
+                
+                <div class="service-card">
+                    <h3>🌐 API Gateway</h3>
+                    <p>Central entry point for all API requests with routing and load balancing.</p>
+                    <span class="status">Running on :8081</span>
+                </div>
+                
+                <div class="service-card">
+                    <h3>🔍 Scanner Manager</h3>
+                    <p>Orchestrates security scans and manages scanning workflows.</p>
+                    <span class="status">Running on :8082</span>
+                </div>
+                
+                <div class="service-card">
+                    <h3>🛡️ Vulnerability Analyzer</h3>
+                    <p>Advanced vulnerability detection and risk assessment engine.</p>
+                    <span class="status">Running on :8083</span>
+                </div>
+                
+                <div class="service-card">
+                    <h3>📊 Report Generator</h3>
+                    <p>Generates comprehensive security reports and compliance documentation.</p>
+                    <span class="status">Running on :8084</span>
+                </div>
+                
+                <div class="service-card">
+                    <h3>📢 Notification Service</h3>
+                    <p>Real-time alerts and notifications for security events.</p>
+                    <span class="status">Running on :8085</span>
+                </div>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number">6</div>
+                    <div>Active Services</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">100%</div>
+                    <div>System Health</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">K3s</div>
+                    <div>Kubernetes Platform</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">GitOps</div>
+                    <div>Deployment Method</div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>MCP Security Platform v1.0.0 | Deployed with Argo CD on Kubernetes</p>
+                <p>🏰 Running on Fortress Server | 🔒 Corporate Proxy Enabled</p>
+            </div>
+        </div>
+    </body>
+    </html>

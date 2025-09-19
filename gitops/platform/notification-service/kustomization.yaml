@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: notification-service
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security
+
+resources:
+- deployment.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: mcp-security-platform
+    app.kubernetes.io/component: notifications
+    app.kubernetes.io/managed-by: argocd
