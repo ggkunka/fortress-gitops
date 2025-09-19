@@ -321,3 +321,111 @@ spec:
   info:
   - name: Description
     value: "Plugin Manager for extensible security modules"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: graphql-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: api-gateway
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/graphql-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "GraphQL API gateway for unified data access"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: websocket-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: websocket-gateway
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: realtime-communication
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/websocket-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "WebSocket gateway for real-time communication"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cicd-integration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cicd-integration
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: external-integration
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/cicd-integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "CI/CD pipeline security integration"
