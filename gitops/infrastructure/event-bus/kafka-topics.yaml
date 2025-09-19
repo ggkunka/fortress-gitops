@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topics-setup
+  labels:
+    app: kafka-topics-setup
+    component: event-bus
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: kafka-topics
+        image: confluentinc/cp-kafka:7.4.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for Kafka to be ready..."
+          until kafka-topics --bootstrap-server kafka:9092 --list; do
+            echo "Kafka not ready, waiting..."
+            sleep 10
+          done
+          
+          echo "Creating MCP Security Platform topics..."
+          
+          # Core event topics
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.security.vulnerabilities \
+            --partitions 6 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.security.threats \
+            --partitions 6 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.security.incidents \
+            --partitions 3 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.security.alerts \
+            --partitions 6 --replication-factor 3
+          
+          # Service-specific topics
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.auth.login \
+            --partitions 3 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.scanner.results \
+            --partitions 6 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.analysis.completed \
+            --partitions 6 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.reports.generated \
+            --partitions 3 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.notifications.send \
+            --partitions 3 --replication-factor 3
+          
+          # System and audit topics
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.system.health \
+            --partitions 3 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.audit.actions \
+            --partitions 3 --replication-factor 3
+          
+          # Plugin and integration topics
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.plugins.loaded \
+            --partitions 3 --replication-factor 3
+          
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic mcp.events.integrations.data \
+            --partitions 6 --replication-factor 3
+          
+          echo "Topics created successfully!"
+          kafka-topics --bootstrap-server kafka:9092 --list
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"

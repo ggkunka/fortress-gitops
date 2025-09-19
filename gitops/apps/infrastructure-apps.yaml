@@ -151,3 +151,75 @@ spec:
   info:
   - name: Description
     value: "Redis cache and pub/sub for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: event-bus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: event-bus
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: messaging
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/event-bus
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Apache Kafka event bus for event-driven architecture"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: observability
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: monitoring
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/observability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Prometheus and Grafana monitoring stack"

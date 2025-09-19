@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: event-bus
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security
+
+resources:
+- zookeeper.yaml
+- kafka-cluster.yaml
+- kafka-topics.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/name: event-bus
+    app.kubernetes.io/part-of: mcp-security-platform
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/managed-by: argocd
+
+# Add server-id annotations for StatefulSet pods
+patchesJson6902:
+- target:
+    group: apps
+    version: v1
+    kind: StatefulSet
+    name: zookeeper
+  patch: |-
+    - op: add
+      path: /spec/template/metadata/annotations
+      value:
+        zookeeper.apache.org/server-id: "1"
+- target:
+    group: apps
+    version: v1
+    kind: StatefulSet
+    name: kafka
+  patch: |-
+    - op: add
+      path: /spec/template/metadata/annotations
+      value:
+        kafka.apache.org/broker-id: "1"
