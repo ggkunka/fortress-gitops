@@ -7,7 +7,7 @@ metadata:
     component: event-bus
 spec:
   serviceName: zookeeper-headless
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: zookeeper
@@ -31,11 +31,9 @@ spec:
         - name: ZOOKEEPER_CLIENT_PORT
           value: "2181"
         - name: ZOOKEEPER_SERVER_ID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.annotations['zookeeper.apache.org/server-id']
+          value: "1"
         - name: ZOOKEEPER_SERVERS
-          value: "zookeeper-0.zookeeper-headless:2888:3888;zookeeper-1.zookeeper-headless:2888:3888;zookeeper-2.zookeeper-headless:2888:3888"
+          value: "zookeeper-0.zookeeper-headless:2888:3888"
         - name: ZOOKEEPER_TICK_TIME
           value: "2000"
         - name: ZOOKEEPER_INIT_LIMIT

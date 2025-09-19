@@ -27,58 +27,58 @@ spec:
           # Core event topics
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.security.vulnerabilities \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.security.threats \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.security.incidents \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.security.alerts \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           # Service-specific topics
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.auth.login \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.scanner.results \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.analysis.completed \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.reports.generated \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.notifications.send \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           # System and audit topics
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.system.health \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.audit.actions \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           # Plugin and integration topics
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.plugins.loaded \
-            --partitions 3 --replication-factor 3
+            --partitions 1 --replication-factor 1
           
           kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic mcp.events.integrations.data \
-            --partitions 6 --replication-factor 3
+            --partitions 3 --replication-factor 1
           
           echo "Topics created successfully!"
           kafka-topics --bootstrap-server kafka:9092 --list
