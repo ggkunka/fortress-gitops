@@ -60,8 +60,7 @@ spec:
           periodSeconds: 5
       volumes:
       - name: minio-storage
-        persistentVolumeClaim:
-          claimName: minio-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

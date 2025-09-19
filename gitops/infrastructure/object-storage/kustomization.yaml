@@ -9,7 +9,7 @@ metadata:
 namespace: mcp-security
 
 resources:
-- minio.yaml
+- minio-simple.yaml
 
 labels:
 - pairs:

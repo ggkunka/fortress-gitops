@@ -9,7 +9,7 @@ metadata:
 namespace: mcp-security
 
 resources:
-- elasticsearch.yaml
+- elasticsearch-simple.yaml
 
 labels:
 - pairs:
