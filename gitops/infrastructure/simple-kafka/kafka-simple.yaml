@@ -68,6 +68,10 @@ spec:
         app: kafka
         component: event-bus
     spec:
+      initContainers:
+      - name: wait-for-zookeeper
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z zookeeper 2181; do echo "Waiting for Zookeeper..."; sleep 2; done; echo "Zookeeper is ready!"']
       containers:
       - name: kafka
         image: confluentinc/cp-kafka:7.4.0
