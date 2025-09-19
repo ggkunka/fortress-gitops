@@ -259,3 +259,74 @@ spec:
   info:
   - name: Description
     value: "Elasticsearch for search and analytics"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: service-mesh
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mesh
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: networking
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/service-mesh
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Istio service mesh for advanced networking"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: object-storage
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: object-storage
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: storage
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/object-storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "MinIO object storage for files and artifacts"

@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: object-storage
+    spec:
+      containers:
+      - name: minio
+        image: quay.io/minio/minio:RELEASE.2023-11-15T20-43-25Z
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - minio server /data --console-address :9001
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          value: "mcp-admin"
+        - name: MINIO_ROOT_PASSWORD
+          value: "McpSecure123!"
+        - name: MINIO_BROWSER_REDIRECT_URL
+          value: "http://mcp-security.fortress.local/minio"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: minio-storage
+        persistentVolumeClaim:
+          claimName: minio-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  selector:
+    app: minio
+  ports:
+  - name: api
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9001
+    targetPort: 9001
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-storage
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "local-path"
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-setup
+  labels:
+    app: minio-setup
+    component: object-storage
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: minio-setup
+        image: quay.io/minio/mc:RELEASE.2023-11-15T22-45-58Z
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for MinIO to be ready..."
+          until mc alias set mcp http://minio:9000 mcp-admin McpSecure123!; do
+            echo "MinIO not ready, waiting..."
+            sleep 10
+          done
+          
+          echo "Creating MCP Security Platform buckets..."
+          
+          # Security reports bucket
+          mc mb mcp/security-reports --ignore-existing
+          mc policy set public mcp/security-reports
+          
+          # Vulnerability data bucket
+          mc mb mcp/vulnerability-data --ignore-existing
+          mc policy set private mcp/vulnerability-data
+          
+          # Scan results bucket
+          mc mb mcp/scan-results --ignore-existing
+          mc policy set private mcp/scan-results
+          
+          # Audit logs bucket
+          mc mb mcp/audit-logs --ignore-existing
+          mc policy set private mcp/audit-logs
+          
+          # Plugin artifacts bucket
+          mc mb mcp/plugin-artifacts --ignore-existing
+          mc policy set private mcp/plugin-artifacts
+          
+          # Backup bucket
+          mc mb mcp/backups --ignore-existing
+          mc policy set private mcp/backups
+          
+          echo "MinIO buckets created successfully!"
+          mc ls mcp/
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
