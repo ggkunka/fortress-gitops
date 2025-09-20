@@ -104,43 +104,43 @@ class ApiService {
   }
 
   // Security Dashboard APIs
-  async getSecurityOverview() {
+  getSecurityOverview = async () => {
     const response = await this.axiosInstance.get(`${API_BASE}/dashboard/overview`);
     return response.data;
-  }
+  };
 
-  async getSecurityMetrics() {
+  getSecurityMetrics = async () => {
     const response = await this.axiosInstance.get(`${API_BASE}/dashboard/metrics`);
     return response.data;
-  }
+  };
 
-  async getThreatDetectionData() {
+  getThreatDetectionData = async () => {
     const response = await this.axiosInstance.get(`${API_BASE}/threats/detection`);
     return response.data;
-  }
+  };
 
   // Cluster Management APIs
-  async getClusters() {
+  getClusters = async () => {
     const response = await this.axiosInstance.get(`${API_BASE}/clusters`);
     return response.data;
-  }
+  };
 
   async getClusterDetails(clusterId: string) {
     const response = await this.axiosInstance.get(`${API_BASE}/clusters/${clusterId}`);
     return response.data;
   }
 
-  async getPods(clusterId?: string) {
+  getPods = async (clusterId?: string) => {
     const url = clusterId ? `${API_BASE}/clusters/${clusterId}/pods` : `${API_BASE}/pods`;
     const response = await this.axiosInstance.get(url);
     return response.data;
-  }
+  };
 
-  async getServices(clusterId?: string) {
+  getServices = async (clusterId?: string) => {
     const url = clusterId ? `${API_BASE}/clusters/${clusterId}/services` : `${API_BASE}/services`;
     const response = await this.axiosInstance.get(url);
     return response.data;
-  }
+  };
 
   async createPod(clusterId: string, podSpec: any) {
     const response = await this.axiosInstance.post(
@@ -158,20 +158,20 @@ class ApiService {
   }
 
   // Vulnerability Management APIs
-  async getVulnerabilities() {
+  getVulnerabilities = async () => {
     const response = await this.axiosInstance.get(`${API_BASE}/vulnerabilities`);
     return response.data;
-  }
+  };
 
   async getVulnerabilityDetails(cveId: string) {
     const response = await this.axiosInstance.get(`${API_BASE}/vulnerabilities/${cveId}`);
     return response.data;
   }
 
-  async scanCluster(clusterId: string) {
+  scanCluster = async (clusterId: string) => {
     const response = await this.axiosInstance.post(`${API_BASE}/scan/cluster/${clusterId}`);
     return response.data;
-  }
+  };
 
   async getScanResults(scanId: string) {
     const response = await this.axiosInstance.get(`${API_BASE}/scan/results/${scanId}`);
