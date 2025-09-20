@@ -34,10 +34,14 @@ import {
   AccountCircle as AccountIcon,
   Logout as LogoutIcon,
   Help as HelpIcon,
+  Shield as FortressIcon,
+  Cloud as CloudIcon,
+  AccountTree as ClustersIcon,
+  Storage as RepositoriesIcon,
 } from '@mui/icons-material';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../hooks/useNotifications';
+// import { useNotifications } from '../../hooks/useNotifications';
 
 const drawerWidth = 240;
 
@@ -51,10 +55,22 @@ interface NavigationItem {
 
 const navigationItems: NavigationItem[] = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    path: '/dashboard',
-    icon: <DashboardIcon />,
+    id: 'fortress',
+    label: 'Fortress Dashboard',
+    path: '/',
+    icon: <FortressIcon />,
+  },
+  {
+    id: 'clusters',
+    label: 'Clusters',
+    path: '/clusters',
+    icon: <ClustersIcon />,
+  },
+  {
+    id: 'repositories',
+    label: 'Repositories',
+    path: '/repositories',
+    icon: <RepositoriesIcon />,
   },
   {
     id: 'scans',
@@ -86,12 +102,6 @@ const navigationItems: NavigationItem[] = [
     path: '/marketplace',
     icon: <MarketplaceIcon />,
   },
-  {
-    id: 'settings',
-    label: 'Settings',
-    path: '/settings',
-    icon: <SettingsIcon />,
-  },
 ];
 
 export const AppLayout: React.FC = () => {
@@ -100,7 +110,8 @@ export const AppLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { data: notifications } = useNotifications();
+  // const { data: notifications } = useNotifications();
+  const notifications: any[] = []; // Placeholder for notifications
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -140,7 +151,7 @@ export const AppLayout: React.FC = () => {
     <Box>
       <Toolbar>
         <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
-          MCP Security
+          🏰 Fortress
         </Typography>
       </Toolbar>
       <Divider />
@@ -201,7 +212,7 @@ export const AppLayout: React.FC = () => {
           </IconButton>
           
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {navigationItems.find(item => isActivePath(item.path))?.label || 'MCP Security Platform'}
+            {navigationItems.find(item => isActivePath(item.path))?.label || 'Fortress Security Platform'}
           </Typography>
 
           {/* Notifications */}

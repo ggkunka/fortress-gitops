@@ -154,8 +154,7 @@ const App: React.FC = () => {
                   <ProtectedRoute>
                     <AppLayout>
                       <Routes>
-                        <Route path="/" element={<Navigate to="/fortress" replace />} />
-                        <Route path="/fortress" element={<FortressDashboard userRole="admin" permissions={{
+                        <Route path="/" element={<FortressDashboard userRole="admin" permissions={{
                           role: 'admin',
                           permissions: {
                             clusters: { view: true, create: true, edit: true, delete: true, deploy: true },
@@ -187,7 +186,7 @@ const App: React.FC = () => {
                         <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/integrations" element={<IntegrationsPage />} />
                         <Route path="/marketplace" element={<MarketplacePage />} />
-                        <Route path="*" element={<Navigate to="/fortress" replace />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
                     </AppLayout>
                   </ProtectedRoute>
