@@ -18,9 +18,8 @@ spec:
     spec:
       containers:
       - name: gateway-service
-        image: python:3.11-slim
-        command: ["/bin/sh"]
-        args: ["-c", "echo 'API Gateway Service - MCP Security Platform' && echo 'Container ready for development' && tail -f /dev/null"]
+        image: mcp-security/gateway-service:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8081
         env:
