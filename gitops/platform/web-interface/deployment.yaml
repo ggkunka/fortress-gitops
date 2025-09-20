@@ -212,46 +212,46 @@ data:
     <body>
         <div class="container">
             <div class="header">
-                <h1>🛡️ MCP Security Platform</h1>
-                <p>Enhanced Security Dashboard with Premium Features</p>
-                <span class="status">🚀 ENHANCED VERSION DEPLOYED</span>
+                <h1>🏰 Fortress Security Platform</h1>
+                <p>Enterprise Cloud Workload Protection & Runtime Security</p>
+                <span class="status">🚀 FORTRESS CNAPP DEPLOYED</span>
             </div>
             
             <div class="services-grid">
                 <div class="service-card">
-                    <h3>🎨 Premium Dashboard</h3>
-                    <p>Interactive security visualization with D3.js graphs and real-time monitoring.</p>
-                    <span class="status">Enhanced UI</span>
+                    <h3>🛡️ Security Posture</h3>
+                    <p>Real-time security scoring with comprehensive grade system and trend analysis.</p>
+                    <span class="status">AI-Powered</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🔐 Role-Based Access</h3>
-                    <p>Admin, User, Security Analyst roles with granular permissions.</p>
-                    <span class="status">RBAC Enabled</span>
+                    <h3>🚨 Threat Detection</h3>
+                    <p>Advanced threat detection with behavioral analytics and automated response.</p>
+                    <span class="status">Real-Time</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🕸️ Security Graph</h3>
-                    <p>CVE relationship mapping across clusters, pods, and processes.</p>
-                    <span class="status">D3.js Powered</span>
+                    <h3>⚡ Runtime Security</h3>
+                    <p>Container runtime protection with process, network, and file monitoring.</p>
+                    <span class="status">Zero Trust</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🔧 Patch Management</h3>
-                    <p>Automated patch building with Kubernetes integration.</p>
-                    <span class="status">K8s Ready</span>
+                    <h3>🔍 Vulnerability Management</h3>
+                    <p>CVE tracking with CVSS scoring, automated patching, and remediation workflows.</p>
+                    <span class="status">CVSS 4.0</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>☁️ Cluster Management</h3>
-                    <p>Connect and manage any Kubernetes cluster with certificate auth.</p>
-                    <span class="status">Multi-Cloud</span>
+                    <h3>📋 Compliance Frameworks</h3>
+                    <p>SOC2, PCI DSS, GDPR, HIPAA, ISO 27001 compliance monitoring and reporting.</p>
+                    <span class="status">Multi-Framework</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>📦 Repository Integration</h3>
-                    <p>Docker Hub, Harbor, ECR, GCR with automated scanning.</p>
-                    <span class="status">Multi-Registry</span>
+                    <h3>🤖 AI Security Insights</h3>
+                    <p>ML-powered anomaly detection, predictive analytics, and automated actions.</p>
+                    <span class="status">ML-Driven</span>
                 </div>
             </div>
             
@@ -275,8 +275,8 @@ data:
             </div>
             
             <div class="footer">
-                <p>MCP Security Platform v2.0 Enhanced | Deployed with GitOps on Kubernetes</p>
-                <p>🏰 Running on Fortress Server | 🚀 Premium Features Enabled</p>
+                <p>Fortress Security Platform v3.0 Enterprise | Cloud Workload Protection Platform</p>
+                <p>🏰 Running on Fortress Server | 🤖 AI-Powered Security | 🔒 Zero Trust Architecture</p>
             </div>
         </div>
     </body>
