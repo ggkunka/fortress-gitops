@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Fortress Integration Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%); color: #ffffff; min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .integration-status { display: flex; align-items: center; gap: 1rem; padding: 1rem 2rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; margin-bottom: 2rem; }
+        .status-icon { font-size: 2rem; color: #10b981; }
+        .status-text { flex: 1; }
+        .status-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; color: #10b981; }
+        .integrations-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+        .integration-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; position: relative; }
+        .integration-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0; }
+        .siem-card::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .soar-card::before { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
+        .cloud-card::before { background: linear-gradient(90deg, #10b981, #059669); }
+        .integration-icon { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem; }
+        .integration-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .integration-description { font-size: 0.9rem; opacity: 0.8; margin-bottom: 1.5rem; line-height: 1.5; }
+        .connection-status { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; }
+        .status-connected { background: #10b981; }
+        .status-pending { background: #f59e0b; }
+        .integration-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0; }
+        .metric { text-align: center; padding: 1rem; background: rgba(255, 255, 255, 0.02); border-radius: 8px; }
+        .metric-value { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .metric-label { font-size: 0.8rem; opacity: 0.7; }
+        .btn { background: linear-gradient(135deg, #00d4ff, #7c3aed); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-small { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        .integration-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .tab { padding: 0.75rem 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .tab.active { background: linear-gradient(135deg, #00d4ff, #7c3aed); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .data-flow { display: flex; align-items: center; justify-content: space-between; margin: 2rem 0; padding: 2rem; background: rgba(255, 255, 255, 0.02); border-radius: 12px; }
+        .flow-node { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+        .flow-arrow { color: #00d4ff; font-size: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-plug"></i> Integration Management</h1>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="addIntegration()">
+                    <i class="fas fa-plus"></i> Add Integration
+                </button>
+                <button class="btn btn-secondary" onclick="testConnections()">
+                    <i class="fas fa-network-wired"></i> Test All
+                </button>
+                <button class="btn btn-secondary" onclick="syncData()">
+                    <i class="fas fa-sync-alt"></i> Sync Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Integration Status -->
+        <div class="integration-status">
+            <div class="status-icon">
+                <i class="fas fa-network-wired"></i>
+            </div>
+            <div class="status-text">
+                <div class="status-title">Integration Health: 94.2%</div>
+                <div style="opacity: 0.8;">12 active integrations • 2.3M events processed today • Last sync: 5 minutes ago</div>
+            </div>
+            <div>
+                <span style="font-size: 0.9rem; opacity: 0.8;">Data Flow: </span>
+                <span style="font-size: 1.2rem; font-weight: 700; color: #10b981;">ACTIVE</span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('siem')">SIEM Integrations</div>
+            <div class="tab" onclick="showTab('soar')">SOAR Platforms</div>
+            <div class="tab" onclick="showTab('cloud')">Cloud Providers</div>
+        </div>
+
+        <!-- SIEM Integrations Tab -->
+        <div id="siem-tab" class="tab-content active">
+            <div class="integrations-grid">
+                <div class="integration-card siem-card">
+                    <div class="integration-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="integration-title">Splunk Enterprise</div>
+                    <div class="integration-description">
+                        Enterprise SIEM platform with HTTP Event Collector (HEC) integration for real-time security event streaming.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - splunk.company.com:8088</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">847K</div>
+                            <div class="metric-label">Events Sent</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">99.8%</div>
+                            <div class="metric-label">Success Rate</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('splunk')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('splunk')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewLogs('splunk')">
+                            <i class="fas fa-file-alt"></i> Logs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="integration-card siem-card">
+                    <div class="integration-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div class="integration-title">Elasticsearch SIEM</div>
+                    <div class="integration-description">
+                        Elastic Security with machine learning-based threat detection and investigation capabilities.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - elastic.security.local:9200</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">1.2M</div>
+                            <div class="metric-label">Documents</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">156</div>
+                            <div class="metric-label">ML Jobs</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('elastic')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('elastic')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewLogs('elastic')">
+                            <i class="fas fa-file-alt"></i> Logs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="integration-card siem-card">
+                    <div class="integration-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                        <i class="fas fa-radar"></i>
+                    </div>
+                    <div class="integration-title">IBM QRadar</div>
+                    <div class="integration-description">
+                        Enterprise security intelligence platform with advanced threat detection and compliance reporting.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-pending"></div>
+                        <span>Pending - qradar.corp.local:443</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #f59e0b;">0</div>
+                            <div class="metric-label">Events Sent</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #f59e0b;">--</div>
+                            <div class="metric-label">Success Rate</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('qradar')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('qradar')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewLogs('qradar')">
+                            <i class="fas fa-file-alt"></i> Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOAR Platforms Tab -->
+        <div id="soar-tab" class="tab-content">
+            <div class="integrations-grid">
+                <div class="integration-card soar-card">
+                    <div class="integration-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="integration-title">Phantom SOAR</div>
+                    <div class="integration-description">
+                        Security orchestration, automation and response platform with playbook automation and case management.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - phantom.security.local</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">234</div>
+                            <div class="metric-label">Playbooks</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">89</div>
+                            <div class="metric-label">Automated</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('phantom')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('phantom')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewPlaybooks('phantom')">
+                            <i class="fas fa-play"></i> Playbooks
+                        </button>
+                    </div>
+                </div>
+
+                <div class="integration-card soar-card">
+                    <div class="integration-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div class="integration-title">Demisto XSOAR</div>
+                    <div class="integration-description">
+                        Extended security orchestration, automation and response with AI-powered incident management.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - xsoar.company.com</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">567</div>
+                            <div class="metric-label">Incidents</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">78%</div>
+                            <div class="metric-label">Auto-Resolved</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('xsoar')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('xsoar')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewIncidents('xsoar')">
+                            <i class="fas fa-exclamation-triangle"></i> Incidents
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cloud Providers Tab -->
+        <div id="cloud-tab" class="tab-content">
+            <div class="integrations-grid">
+                <div class="integration-card cloud-card">
+                    <div class="integration-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <i class="fab fa-aws"></i>
+                    </div>
+                    <div class="integration-title">AWS Security Hub</div>
+                    <div class="integration-description">
+                        Centralized security findings aggregation with GuardDuty, Inspector, and Config integration.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - us-east-1</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">1,847</div>
+                            <div class="metric-label">Findings</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">23</div>
+                            <div class="metric-label">Accounts</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('aws')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('aws')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewFindings('aws')">
+                            <i class="fas fa-search"></i> Findings
+                        </button>
+                    </div>
+                </div>
+
+                <div class="integration-card cloud-card">
+                    <div class="integration-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <i class="fab fa-microsoft"></i>
+                    </div>
+                    <div class="integration-title">Azure Sentinel</div>
+                    <div class="integration-description">
+                        Cloud-native SIEM with AI-powered threat detection and automated response capabilities.
+                    </div>
+                    <div class="connection-status">
+                        <div class="status-indicator status-connected"></div>
+                        <span>Connected - eastus2</span>
+                    </div>
+                    <div class="integration-metrics">
+                        <div class="metric">
+                            <div class="metric-value" style="color: #10b981;">3.2M</div>
+                            <div class="metric-label">Log Events</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" style="color: #00d4ff;">45</div>
+                            <div class="metric-label">Analytics Rules</div>
+                        </div>
+                    </div>
+                    <div class="integration-actions">
+                        <button class="btn btn-success btn-small" onclick="configureIntegration('azure')">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="testIntegration('azure')">
+                            <i class="fas fa-vial"></i> Test
+                        </button>
+                        <button class="btn btn-warning btn-small" onclick="viewWorkbooks('azure')">
+                            <i class="fas fa-chart-bar"></i> Workbooks
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Flow Visualization -->
+        <div class="data-flow">
+            <div class="flow-node">
+                <div style="padding: 1rem; background: rgba(16, 185, 129, 0.2); border-radius: 8px; color: #10b981;">
+                    <i class="fas fa-server"></i>
+                </div>
+                <div>Fortress Platform</div>
+            </div>
+            <div class="flow-arrow">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+            <div class="flow-node">
+                <div style="padding: 1rem; background: rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444;">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div>SIEM Systems</div>
+            </div>
+            <div class="flow-arrow">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+            <div class="flow-node">
+                <div style="padding: 1rem; background: rgba(59, 130, 246, 0.2); border-radius: 8px; color: #3b82f6;">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div>SOAR Platforms</div>
+            </div>
+            <div class="flow-arrow">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+            <div class="flow-node">
+                <div style="padding: 1rem; background: rgba(16, 185, 129, 0.2); border-radius: 8px; color: #10b981;">
+                    <i class="fas fa-cloud"></i>
+                </div>
+                <div>Cloud Security</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function addIntegration() {
+            alert('🔌 Add New Integration\n\nSupported integrations:\n• SIEM: Splunk, Elasticsearch, QRadar, ArcSight\n• SOAR: Phantom, XSOAR, Swimlane, Resilient\n• Cloud: AWS, Azure, GCP Security Centers\n• DevOps: Jenkins, GitLab, GitHub Actions\n• Threat Intel: VirusTotal, ThreatConnect, MISP\n\nIntegration wizard would open here.');
+        }
+
+        function testConnections() {
+            alert('🔍 Testing All Connections\n\nRunning connectivity tests:\n• Splunk HEC: ✅ Connected\n• Elasticsearch: ✅ Connected\n• QRadar: ⚠️ Authentication issue\n• Phantom SOAR: ✅ Connected\n• AWS Security Hub: ✅ Connected\n• Azure Sentinel: ✅ Connected\n\nOverall Health: 94.2%');
+        }
+
+        function syncData() {
+            alert('🔄 Data Synchronization\n\nSyncing data across integrations:\n• Pulling latest security events\n• Updating threat intelligence feeds\n• Synchronizing user contexts\n• Refreshing configuration data\n\nSync completed successfully!');
+        }
+
+        function configureIntegration(type) {
+            alert(`⚙️ Configure ${type} Integration\n\nConfiguration options:\n• Connection settings\n• Authentication credentials\n• Data mapping rules\n• Event filtering\n• Retry policies\n• Rate limiting\n\nConfiguration interface would open here.`);
+        }
+
+        function testIntegration(type) {
+            alert(`🧪 Test ${type} Integration\n\nRunning integration tests:\n• Connectivity check\n• Authentication validation\n• Data flow verification\n• Error handling test\n• Performance benchmark\n\nTest results: ✅ All tests passed`);
+        }
+
+        function viewLogs(type) {
+            alert(`📋 ${type} Integration Logs\n\nRecent log entries:\n• [INFO] Connection established\n• [SUCCESS] 1,247 events sent\n• [WARNING] Rate limit approached\n• [INFO] Heartbeat successful\n• [SUCCESS] Configuration updated\n\nLog viewer would open here.`);
+        }
+
+        function viewPlaybooks(type) {
+            alert(`📖 ${type} Playbooks\n\nActive playbooks:\n• Incident Response Automation\n• Threat Hunting Workflow\n• Vulnerability Remediation\n• Compliance Validation\n• User Access Review\n\nPlaybook management interface would open.`);
+        }
+
+        function viewIncidents(type) {
+            alert(`🚨 ${type} Incidents\n\nActive incidents:\n• High: 3 incidents\n• Medium: 12 incidents\n• Low: 45 incidents\n• Auto-resolved: 78%\n• Average MTTR: 23 minutes\n\nIncident dashboard would open here.`);
+        }
+
+        function viewFindings(type) {
+            alert(`🔍 ${type} Security Findings\n\nRecent findings:\n• Critical: 12 findings\n• High: 45 findings\n• Medium: 234 findings\n• Compliance: 89% pass rate\n• Remediation: 67% automated\n\nFindings dashboard would open here.`);
+        }
+
+        function viewWorkbooks(type) {
+            alert(`📊 ${type} Security Workbooks\n\nAvailable workbooks:\n• Security Operations Overview\n• Threat Hunting Analytics\n• Identity & Access Analysis\n• Network Security Monitoring\n• Compliance Dashboard\n\nWorkbook gallery would open here.`);
+        }
+    </script>
+</body>
+</html>
