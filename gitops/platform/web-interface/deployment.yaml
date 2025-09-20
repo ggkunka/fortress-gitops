@@ -18,9 +18,10 @@ spec:
     spec:
       containers:
       - name: web-interface
-        image: nginx:1.25-alpine
+        image: fortress-web-ui:latest
+        imagePullPolicy: Never
         ports:
-        - containerPort: 80
+        - containerPort: 3000
         env:
         - name: SERVICE_NAME
           value: "web-interface"
@@ -28,39 +29,29 @@ spec:
           value: "http://gateway-service:8081"
         - name: AUTH_SERVICE_URL
           value: "http://auth-service:8080"
+        - name: REACT_APP_API_URL
+          value: "http://10.63.89.182:30080/api"
+        - name: REACT_APP_WS_URL
+          value: "ws://10.63.89.182:30080/ws"
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
             memory: "128Mi"
             cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /
-            port: 80
-          initialDelaySeconds: 30
-          periodSeconds: 10
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /
-            port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/conf.d/default.conf
-          subPath: default.conf
-        - name: web-content
-          mountPath: /usr/share/nginx/html/index.html
-          subPath: index.html
-      volumes:
-      - name: nginx-config
-        configMap:
-          name: web-interface-nginx-config
-      - name: web-content
-        configMap:
-          name: web-interface-content
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
@@ -75,209 +66,6 @@ spec:
   ports:
   - name: http
     port: 80
-    targetPort: 80
+    targetPort: 3000
     protocol: TCP
   type: ClusterIP
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: web-interface-nginx-config
-data:
-  default.conf: |
-    server {
-        listen 80;
-        server_name localhost;
-        
-        location / {
-            root /usr/share/nginx/html;
-            index index.html;
-            try_files $uri $uri/ /index.html;
-        }
-        
-        location /api/ {
-            proxy_pass http://gateway-service:8081/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        location /auth/ {
-            proxy_pass http://auth-service:8080/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: web-interface-content
-data:
-  index.html: |
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>MCP Security Platform - Enhanced Dashboard</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            body {
-                font-family: 'Inter', sans-serif;
-                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                color: white;
-                margin: 0;
-                min-height: 100vh;
-            }
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 2rem;
-            }
-            .header {
-                text-align: center;
-                margin-bottom: 3rem;
-            }
-            .header h1 {
-                font-size: 3.5rem;
-                margin-bottom: 1rem;
-                background: linear-gradient(135deg, #2563eb, #7c3aed);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            .header p {
-                font-size: 1.2rem;
-                opacity: 0.9;
-            }
-            .services-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 2rem;
-                margin-bottom: 3rem;
-            }
-            .service-card {
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 1.5rem;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                transition: transform 0.3s ease;
-            }
-            .service-card:hover {
-                transform: translateY(-5px);
-            }
-            .service-card h3 {
-                margin-top: 0;
-                color: #fff;
-                font-size: 1.3rem;
-            }
-            .service-card p {
-                opacity: 0.8;
-                line-height: 1.6;
-            }
-            .status {
-                background: #10b981;
-                padding: 0.5rem 1rem;
-                border-radius: 20px;
-                font-weight: bold;
-            }
-            .stats {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 1rem;
-                margin-top: 2rem;
-            }
-            .stat-card {
-                background: rgba(255, 255, 255, 0.15);
-                padding: 1rem;
-                border-radius: 8px;
-                text-align: center;
-            }
-            .stat-number {
-                font-size: 2rem;
-                font-weight: bold;
-                margin-bottom: 0.5rem;
-            }
-            .footer {
-                text-align: center;
-                margin-top: 3rem;
-                opacity: 0.7;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🏰 Fortress Security Platform</h1>
-                <p>Enterprise Cloud Workload Protection & Runtime Security</p>
-                <span class="status">🚀 FORTRESS CNAPP DEPLOYED</span>
-            </div>
-            
-            <div class="services-grid">
-                <div class="service-card">
-                    <h3>🛡️ Security Posture</h3>
-                    <p>Real-time security scoring with comprehensive grade system and trend analysis.</p>
-                    <span class="status">AI-Powered</span>
-                </div>
-                
-                <div class="service-card">
-                    <h3>🚨 Threat Detection</h3>
-                    <p>Advanced threat detection with behavioral analytics and automated response.</p>
-                    <span class="status">Real-Time</span>
-                </div>
-                
-                <div class="service-card">
-                    <h3>⚡ Runtime Security</h3>
-                    <p>Container runtime protection with process, network, and file monitoring.</p>
-                    <span class="status">Zero Trust</span>
-                </div>
-                
-                <div class="service-card">
-                    <h3>🔍 Vulnerability Management</h3>
-                    <p>CVE tracking with CVSS scoring, automated patching, and remediation workflows.</p>
-                    <span class="status">CVSS 4.0</span>
-                </div>
-                
-                <div class="service-card">
-                    <h3>📋 Compliance Frameworks</h3>
-                    <p>SOC2, PCI DSS, GDPR, HIPAA, ISO 27001 compliance monitoring and reporting.</p>
-                    <span class="status">Multi-Framework</span>
-                </div>
-                
-                <div class="service-card">
-                    <h3>🤖 AI Security Insights</h3>
-                    <p>ML-powered anomaly detection, predictive analytics, and automated actions.</p>
-                    <span class="status">ML-Driven</span>
-                </div>
-            </div>
-            
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="stat-number">15</div>
-                    <div>Microservices</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">97%</div>
-                    <div>System Health</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">Enhanced</div>
-                    <div>Premium UI</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">GitOps</div>
-                    <div>Deployment Method</div>
-                </div>
-            </div>
-            
-            <div class="footer">
-                <p>Fortress Security Platform v3.0 Enterprise | Cloud Workload Protection Platform</p>
-                <p>🏰 Running on Fortress Server | 🤖 AI-Powered Security | 🔒 Zero Trust Architecture</p>
-            </div>
-        </div>
-    </body>
-    </html>
