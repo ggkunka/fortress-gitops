@@ -11,33 +11,25 @@ import redis.asyncio as redis
 import structlog
 import uvicorn
 
-from shared.config import get_settings
-from .config import get_gateway_config
-from .middleware import setup_middleware
-from .proxy import GatewayProxy
+from .settings import get_settings
 
 settings = get_settings()
-gateway_config = get_gateway_config()
 logger = structlog.get_logger()
 
 # Global instances
 redis_client: redis.Redis = None
-gateway_proxy: GatewayProxy = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    global redis_client, gateway_proxy
+    global redis_client
     
     # Startup
     logger.info("Starting API Gateway service")
     
     # Initialize Redis client
-    redis_client = redis.from_url(
-        str(settings.redis_url),
-        **settings.get_connection_config(),
-    )
+    redis_client = redis.from_url(settings.redis_url)
     
     # Test Redis connection
     try:
@@ -47,16 +39,9 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to connect to Redis", error=str(e))
         sys.exit(1)
     
-    # Initialize gateway proxy
-    gateway_proxy = GatewayProxy(redis_client)
-    
-    # Start health checks
-    health_check_task = asyncio.create_task(gateway_proxy.start_health_checks())
-    
     # Setup graceful shutdown
     def signal_handler(signum, frame):
         logger.info("Received shutdown signal")
-        health_check_task.cancel()
         asyncio.create_task(shutdown())
     
     signal.signal(signal.SIGINT, signal_handler)
@@ -69,13 +54,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down API Gateway service")
     
-    # Cancel health check task
-    health_check_task.cancel()
-    
     # Close connections
-    if gateway_proxy:
-        await gateway_proxy.close()
-    
     if redis_client:
         await redis_client.close()
     
@@ -100,19 +79,14 @@ app = FastAPI(
     title="MCP Security Platform - API Gateway",
     description="API Gateway service for the MCP Security Assessment Platform",
     version="0.1.0",
-    docs_url="/docs" if not settings.is_production else None,
-    redoc_url="/redoc" if not settings.is_production else None,
-    openapi_url="/openapi.json" if not settings.is_production else None,
+    docs_url="/docs" if not settings.debug else None,
+    redoc_url="/redoc" if not settings.debug else None,
+    openapi_url="/openapi.json" if not settings.debug else None,
     lifespan=lifespan,
 )
 
 
-# Setup middleware
-@app.on_event("startup")
-async def setup_app_middleware():
-    """Setup middleware after Redis client is available."""
-    if redis_client:
-        setup_middleware(app, redis_client)
+# Basic API endpoints
 
 
 # Health check endpoint
@@ -181,27 +155,78 @@ async def ready():
         )
 
 
-# Catch-all route for proxying
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
-async def proxy_handler(request: Request, path: str):
-    """Handle all requests and proxy them to appropriate services."""
-    try:
-        if not gateway_proxy:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Gateway proxy not initialized",
-            )
-        
-        return await gateway_proxy.proxy_request(request)
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Proxy request failed", error=str(e), path=path)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+# Basic API endpoints for testing
+@app.get("/dashboard/overview")
+async def get_dashboard_overview():
+    """Get security dashboard overview."""
+    return {
+        "securityScore": 87.3,
+        "totalAssets": 1247,
+        "criticalVulnerabilities": 23,
+        "activeThreats": 5,
+        "complianceScore": 94.2,
+        "lastUpdated": "2024-09-21T00:00:00Z",
+        "trends": {
+            "securityScore": "+2.1%",
+            "vulnerabilities": "-15%",
+            "threats": "+1",
+            "compliance": "+0.8%"
+        }
+    }
+
+@app.get("/clusters")
+async def get_clusters():
+    """Get cluster information."""
+    return [
+        {
+            "id": "fortress-prod",
+            "name": "Fortress Production",
+            "status": "healthy",
+            "nodes": 12,
+            "pods": 247,
+            "services": 89,
+            "version": "v1.28.2",
+            "region": "us-east-1",
+            "provider": "AWS",
+            "lastScan": "2024-09-21T00:00:00Z",
+            "securityScore": 92.1,
+            "vulnerabilities": {"critical": 2, "high": 8, "medium": 15, "low": 23}
+        }
+    ]
+
+@app.get("/pods")
+async def get_pods():
+    """Get pod information."""
+    return [
+        {
+            "name": "auth-service-5875f8b854-75kjt",
+            "namespace": "mcp-security",
+            "status": "Running",
+            "ready": "1/1",
+            "restarts": 0,
+            "age": "28h",
+            "node": "fortress",
+            "image": "mcp-security/auth-service:latest"
+        }
+    ]
+
+@app.get("/vulnerabilities")
+async def get_vulnerabilities():
+    """Get vulnerability information."""
+    return [
+        {
+            "id": "CVE-2024-1234",
+            "severity": "Critical",
+            "cvssScore": 9.8,
+            "title": "Remote Code Execution in Container Runtime",
+            "description": "A critical vulnerability allowing remote code execution through container escape.",
+            "affectedImages": ["nginx:1.20", "redis:6.2"],
+            "patchAvailable": True,
+            "exploitAvailable": True,
+            "publishedDate": "2024-01-15",
+            "lastModified": "2024-01-20"
+        }
+    ]
 
 
 # Error handlers
@@ -252,7 +277,7 @@ def main():
         workers=1,  # Gateway should run as single process
         log_level=settings.log_level.lower(),
         reload=settings.debug,
-        access_log=settings.access_log_enabled,
+        access_log=True,
     )
 
 
