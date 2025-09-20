@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
       - name: web-interface
-        image: fortress-web-ui:latest
-        imagePullPolicy: IfNotPresent
+        image: localhost/fortress-web-ui:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 3000
         env:
