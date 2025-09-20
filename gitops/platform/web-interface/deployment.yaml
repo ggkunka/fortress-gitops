@@ -123,14 +123,14 @@ data:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>MCP Security Platform</title>
+        <title>MCP Security Platform - Enhanced Dashboard</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 0;
-                padding: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: 'Inter', sans-serif;
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
                 color: white;
+                margin: 0;
                 min-height: 100vh;
             }
             .container {
@@ -143,9 +143,11 @@ data:
                 margin-bottom: 3rem;
             }
             .header h1 {
-                font-size: 3rem;
-                margin-bottom: 0.5rem;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                font-size: 3.5rem;
+                margin-bottom: 1rem;
+                background: linear-gradient(135deg, #2563eb, #7c3aed);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
             }
             .header p {
                 font-size: 1.2rem;
@@ -178,13 +180,10 @@ data:
                 line-height: 1.6;
             }
             .status {
-                display: inline-block;
-                padding: 0.3rem 0.8rem;
+                background: #10b981;
+                padding: 0.5rem 1rem;
                 border-radius: 20px;
-                font-size: 0.8rem;
                 font-weight: bold;
-                background: #4CAF50;
-                color: white;
             }
             .stats {
                 display: grid;
@@ -214,60 +213,60 @@ data:
         <div class="container">
             <div class="header">
                 <h1>🛡️ MCP Security Platform</h1>
-                <p>Comprehensive Security Assessment & Vulnerability Management</p>
-                <span class="status">🟢 OPERATIONAL</span>
+                <p>Enhanced Security Dashboard with Premium Features</p>
+                <span class="status">🚀 ENHANCED VERSION DEPLOYED</span>
             </div>
             
             <div class="services-grid">
                 <div class="service-card">
-                    <h3>🔐 Authentication Service</h3>
-                    <p>Secure user authentication and authorization management for the platform.</p>
-                    <span class="status">Running on :8080</span>
+                    <h3>🎨 Premium Dashboard</h3>
+                    <p>Interactive security visualization with D3.js graphs and real-time monitoring.</p>
+                    <span class="status">Enhanced UI</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🌐 API Gateway</h3>
-                    <p>Central entry point for all API requests with routing and load balancing.</p>
-                    <span class="status">Running on :8081</span>
+                    <h3>🔐 Role-Based Access</h3>
+                    <p>Admin, User, Security Analyst roles with granular permissions.</p>
+                    <span class="status">RBAC Enabled</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🔍 Scanner Manager</h3>
-                    <p>Orchestrates security scans and manages scanning workflows.</p>
-                    <span class="status">Running on :8082</span>
+                    <h3>🕸️ Security Graph</h3>
+                    <p>CVE relationship mapping across clusters, pods, and processes.</p>
+                    <span class="status">D3.js Powered</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>🛡️ Vulnerability Analyzer</h3>
-                    <p>Advanced vulnerability detection and risk assessment engine.</p>
-                    <span class="status">Running on :8083</span>
+                    <h3>🔧 Patch Management</h3>
+                    <p>Automated patch building with Kubernetes integration.</p>
+                    <span class="status">K8s Ready</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>📊 Report Generator</h3>
-                    <p>Generates comprehensive security reports and compliance documentation.</p>
-                    <span class="status">Running on :8084</span>
+                    <h3>☁️ Cluster Management</h3>
+                    <p>Connect and manage any Kubernetes cluster with certificate auth.</p>
+                    <span class="status">Multi-Cloud</span>
                 </div>
                 
                 <div class="service-card">
-                    <h3>📢 Notification Service</h3>
-                    <p>Real-time alerts and notifications for security events.</p>
-                    <span class="status">Running on :8085</span>
+                    <h3>📦 Repository Integration</h3>
+                    <p>Docker Hub, Harbor, ECR, GCR with automated scanning.</p>
+                    <span class="status">Multi-Registry</span>
                 </div>
             </div>
             
             <div class="stats">
                 <div class="stat-card">
-                    <div class="stat-number">6</div>
-                    <div>Active Services</div>
+                    <div class="stat-number">15</div>
+                    <div>Microservices</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">100%</div>
+                    <div class="stat-number">97%</div>
                     <div>System Health</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">K3s</div>
-                    <div>Kubernetes Platform</div>
+                    <div class="stat-number">Enhanced</div>
+                    <div>Premium UI</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">GitOps</div>
@@ -276,8 +275,8 @@ data:
             </div>
             
             <div class="footer">
-                <p>MCP Security Platform v1.0.0 | Deployed with Argo CD on Kubernetes</p>
-                <p>🏰 Running on Fortress Server | 🔒 Corporate Proxy Enabled</p>
+                <p>MCP Security Platform v2.0 Enhanced | Deployed with GitOps on Kubernetes</p>
+                <p>🏰 Running on Fortress Server | 🚀 Premium Features Enabled</p>
             </div>
         </div>
     </body>

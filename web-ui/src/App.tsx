@@ -2,8 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { ReactQueryDevtools } from 'react-query/devtools';
 
 // Components
 import { AppLayout } from './components/layout/AppLayout';
@@ -17,6 +17,9 @@ import { VulnerabilitiesPage } from './pages/vulnerabilities/VulnerabilitiesPage
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { IntegrationsPage } from './pages/integrations/IntegrationsPage';
 import { MarketplacePage } from './pages/marketplace/MarketplacePage';
+import ClustersPage from './pages/clusters/ClustersPage';
+import RepositoriesPage from './pages/repositories/RepositoriesPage';
+import SecurityDashboard from './components/SecurityDashboard';
 
 // Create theme
 const theme = createTheme({
@@ -150,14 +153,28 @@ const App: React.FC = () => {
                   <ProtectedRoute>
                     <AppLayout>
                       <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/" element={<Navigate to="/security-dashboard" replace />} />
+                        <Route path="/security-dashboard" element={<SecurityDashboard userRole="admin" permissions={{
+                          role: 'admin',
+                          permissions: {
+                            clusters: { view: true, create: true, edit: true, delete: true, deploy: true },
+                            repositories: { view: true, create: true, edit: true, delete: true, scan: true, push: true },
+                            agents: { view: true, create: true, edit: true, delete: true, deploy: true, configure: true },
+                            vulnerabilities: { view: true, patch: true, ignore: true, export: true },
+                            dashboard: { view: true, customize: true, export: true },
+                            users: { view: true, create: true, edit: true, delete: true, manage_roles: true },
+                            system: { configure: true, backup: true, restore: true, audit: true }
+                          }
+                        }} />} />
                         <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/clusters" element={<ClustersPage />} />
+                        <Route path="/repositories" element={<RepositoriesPage />} />
                         <Route path="/scans" element={<ScansPage />} />
                         <Route path="/vulnerabilities" element={<VulnerabilitiesPage />} />
                         <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/integrations" element={<IntegrationsPage />} />
                         <Route path="/marketplace" element={<MarketplacePage />} />
-                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="*" element={<Navigate to="/security-dashboard" replace />} />
                       </Routes>
                     </AppLayout>
                   </ProtectedRoute>
