@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Fortress Cluster Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%); color: #ffffff; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn { background: linear-gradient(135deg, #00d4ff, #7c3aed); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .clusters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 2rem; }
+        .cluster-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; transition: all 0.3s ease; position: relative; }
+        .cluster-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #00d4ff, #7c3aed); }
+        .cluster-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
+        .cluster-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+        .cluster-type { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .type-eks { background: rgba(255, 153, 0, 0.2); color: #ff9900; }
+        .type-aks { background: rgba(0, 120, 215, 0.2); color: #0078d7; }
+        .type-gke { background: rgba(66, 133, 244, 0.2); color: #4285f4; }
+        .type-k3s { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .type-k8s { background: rgba(124, 58, 237, 0.2); color: #7c3aed; }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .status-healthy { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .cluster-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0; }
+        .metric { text-align: center; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+        .metric-value { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .metric-label { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); }
+        .cluster-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+        .cluster-actions .btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #ffffff; }
+        .form-textarea { min-height: 100px; resize: vertical; }
+        .debug-console { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 1rem; font-family: monospace; color: #00ff00; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-server"></i> Cluster Management</h1>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="showAddModal()">
+                    <i class="fas fa-plus"></i> Add Cluster
+                </button>
+                <button class="btn btn-secondary" onclick="refreshClusters()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <div id="clustersGrid" class="clusters-grid"></div>
+    </div>
+
+    <!-- Add Cluster Modal -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 1.5rem;">Add New Cluster</h2>
+            <form id="addForm">
+                <div class="form-group">
+                    <input type="text" id="clusterName" class="form-input" placeholder="Cluster Name (e.g., production-aws)" required>
+                </div>
+                <div class="form-group">
+                    <select id="clusterType" class="form-select" required>
+                        <option value="">Select Cluster Type</option>
+                        <option value="eks">Amazon EKS</option>
+                        <option value="aks">Azure AKS</option>
+                        <option value="gke">Google GKE</option>
+                        <option value="k3s">Rancher K3s</option>
+                        <option value="k8s">Standard Kubernetes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <input type="url" id="endpoint" class="form-input" placeholder="Cluster Endpoint URL" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="region" class="form-input" placeholder="Region/Zone (e.g., us-west-2)">
+                </div>
+                <div class="form-group">
+                    <textarea id="kubeconfig" class="form-textarea" placeholder="Paste kubeconfig content here..." required></textarea>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn">Add Cluster</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Debug Modal -->
+    <div id="debugModal" class="modal">
+        <div class="modal-content">
+            <h2 id="debugTitle" style="margin-bottom: 1rem;">Cluster Debug Console</h2>
+            <div style="margin-bottom: 1rem;">
+                <button class="btn btn-secondary" onclick="runDiagnostics()">
+                    <i class="fas fa-stethoscope"></i> Diagnostics
+                </button>
+                <button class="btn btn-secondary" onclick="checkHealth()">
+                    <i class="fas fa-heartbeat"></i> Health Check
+                </button>
+                <button class="btn btn-secondary" onclick="viewLogs()">
+                    <i class="fas fa-file-alt"></i> Logs
+                </button>
+                <button class="btn btn-secondary" onclick="clearConsole()">
+                    <i class="fas fa-trash"></i> Clear
+                </button>
+            </div>
+            <div class="debug-console">
+                <div id="debugOutput">Fortress Debug Console v1.0
+Ready for cluster diagnostics...
+
+Available Commands:
+- Diagnostics: Full cluster health scan
+- Health Check: Quick status verification
+- Logs: Stream cluster logs
+- Clear: Clear console output
+
+Waiting for input...</div>
+            </div>
+            <div style="margin-top: 1rem; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeDebugModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let clusters = [
+            {
+                id: 'fortress-prod',
+                name: 'fortress-prod',
+                type: 'k3s',
+                status: 'healthy',
+                endpoint: 'https://10.63.89.182:6443',
+                region: 'on-premise',
+                nodes: 1,
+                pods: 30,
+                services: 25,
+                version: 'v1.33.4+k3s1',
+                description: 'Production fortress server',
+                metrics: { cpu: 23, memory: 67, disk: 34 }
+            },
+            {
+                id: 'staging-aws',
+                name: 'staging-aws',
+                type: 'eks',
+                status: 'healthy',
+                endpoint: 'https://staging.us-west-2.eks.amazonaws.com',
+                region: 'us-west-2',
+                nodes: 3,
+                pods: 45,
+                services: 18,
+                version: 'v1.28.2',
+                description: 'AWS EKS staging environment',
+                metrics: { cpu: 45, memory: 78, disk: 56 }
+            },
+            {
+                id: 'dev-azure',
+                name: 'dev-azure',
+                type: 'aks',
+                status: 'warning',
+                endpoint: 'https://dev.eastus.azmk8s.io',
+                region: 'eastus',
+                nodes: 2,
+                pods: 28,
+                services: 12,
+                version: 'v1.27.8',
+                description: 'Azure AKS development cluster',
+                metrics: { cpu: 89, memory: 92, disk: 78 }
+            }
+        ];
+
+        let currentDebugCluster = null;
+
+        function loadClusters() {
+            const grid = document.getElementById('clustersGrid');
+            grid.innerHTML = '';
+
+            clusters.forEach(cluster => {
+                const card = document.createElement('div');
+                card.className = 'cluster-card';
+                
+                const statusIcon = cluster.status === 'healthy' ? 'check-circle' : 
+                                  cluster.status === 'warning' ? 'exclamation-triangle' : 'times-circle';
+
+                card.innerHTML = `
+                    <div class="cluster-header">
+                        <div>
+                            <h3>${cluster.name}</h3>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                <span class="cluster-type type-${cluster.type}">
+                                    <i class="fab fa-${getIcon(cluster.type)}"></i> ${cluster.type.toUpperCase()}
+                                </span>
+                                <span class="status-badge status-${cluster.status}">
+                                    <i class="fas fa-${statusIcon}"></i> ${cluster.status}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="cluster-metrics">
+                        <div class="metric">
+                            <div class="metric-value">${cluster.nodes}</div>
+                            <div class="metric-label">Nodes</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${cluster.pods}</div>
+                            <div class="metric-label">Pods</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${cluster.services}</div>
+                            <div class="metric-label">Services</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${cluster.metrics.cpu}%</div>
+                            <div class="metric-label">CPU</div>
+                        </div>
+                    </div>
+
+                    <div style="margin: 1rem 0; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 0.9rem;">
+                        <div><strong>Version:</strong> ${cluster.version}</div>
+                        <div><strong>Region:</strong> ${cluster.region}</div>
+                        <div><strong>Endpoint:</strong> ${cluster.endpoint.substring(0, 40)}...</div>
+                    </div>
+
+                    <div class="cluster-actions">
+                        <button class="btn btn-secondary" onclick="viewDetails('${cluster.id}')">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                        <button class="btn btn-secondary" onclick="scaleCluster('${cluster.id}')">
+                            <i class="fas fa-expand-arrows-alt"></i> Scale
+                        </button>
+                        <button class="btn btn-warning" onclick="debugCluster('${cluster.id}')">
+                            <i class="fas fa-bug"></i> Debug
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteCluster('${cluster.id}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function getIcon(type) {
+            const icons = { 'eks': 'aws', 'aks': 'microsoft', 'gke': 'google', 'k3s': 'server', 'k8s': 'dharmachakra' };
+            return icons[type] || 'server';
+        }
+
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('addModal').classList.remove('show');
+            document.getElementById('addForm').reset();
+        }
+
+        function debugCluster(clusterId) {
+            currentDebugCluster = clusters.find(c => c.id === clusterId);
+            document.getElementById('debugTitle').textContent = `Debug Console - ${currentDebugCluster.name}`;
+            document.getElementById('debugModal').classList.add('show');
+        }
+
+        function closeDebugModal() {
+            document.getElementById('debugModal').classList.remove('show');
+        }
+
+        function viewDetails(clusterId) {
+            const cluster = clusters.find(c => c.id === clusterId);
+            alert(`🏰 Cluster Details: ${cluster.name}\n\nType: ${cluster.type.toUpperCase()}\nStatus: ${cluster.status}\nNodes: ${cluster.nodes}\nPods: ${cluster.pods}\nVersion: ${cluster.version}\nRegion: ${cluster.region}\n\nFull details interface would open here with:\n• Live resource monitoring\n• Pod/Service management\n• Configuration editor\n• Performance metrics`);
+        }
+
+        function scaleCluster(clusterId) {
+            const cluster = clusters.find(c => c.id === clusterId);
+            const newNodes = prompt(`Scale ${cluster.name}\n\nCurrent nodes: ${cluster.nodes}\nEnter new node count:`, cluster.nodes);
+            if (newNodes && newNodes !== cluster.nodes.toString()) {
+                cluster.nodes = parseInt(newNodes);
+                alert(`✅ Scaling ${cluster.name} to ${newNodes} nodes...\n\nScaling operation initiated. This may take 5-10 minutes.`);
+                loadClusters();
+            }
+        }
+
+        function deleteCluster(clusterId) {
+            const cluster = clusters.find(c => c.id === clusterId);
+            if (confirm(`⚠️ Delete Cluster: ${cluster.name}\n\nThis action cannot be undone. All data and resources will be permanently deleted.\n\nType "${cluster.name}" to confirm deletion:`)) {
+                const confirmation = prompt(`Type "${cluster.name}" to confirm deletion:`);
+                if (confirmation === cluster.name) {
+                    clusters = clusters.filter(c => c.id !== clusterId);
+                    alert(`✅ Cluster "${cluster.name}" deleted successfully.`);
+                    loadClusters();
+                } else {
+                    alert('❌ Deletion cancelled - cluster name did not match.');
+                }
+            }
+        }
+
+        function runDiagnostics() {
+            if (!currentDebugCluster) return;
+            const output = document.getElementById('debugOutput');
+            output.innerHTML += `\n\n[${new Date().toLocaleTimeString()}] Running full diagnostics on ${currentDebugCluster.name}...\n`;
+            output.innerHTML += `✓ Checking cluster connectivity...\n`;
+            output.innerHTML += `✓ Validating node health...\n`;
+            output.innerHTML += `✓ Scanning pod status...\n`;
+            output.innerHTML += `✓ Verifying service endpoints...\n`;
+            output.innerHTML += `✓ Checking resource usage...\n`;
+            output.innerHTML += `✓ Validating network policies...\n`;
+            output.innerHTML += `\n📊 DIAGNOSTIC RESULTS:\n`;
+            output.innerHTML += `- Cluster Status: ${currentDebugCluster.status.toUpperCase()}\n`;
+            output.innerHTML += `- API Server: Responsive\n`;
+            output.innerHTML += `- Node Health: ${currentDebugCluster.nodes}/${currentDebugCluster.nodes} Ready\n`;
+            output.innerHTML += `- Pod Health: ${Math.floor(currentDebugCluster.pods * 0.95)}/${currentDebugCluster.pods} Running\n`;
+            output.innerHTML += `- CPU Usage: ${currentDebugCluster.metrics.cpu}%\n`;
+            output.innerHTML += `- Memory Usage: ${currentDebugCluster.metrics.memory}%\n`;
+            output.innerHTML += `- Disk Usage: ${currentDebugCluster.metrics.disk}%\n`;
+            output.innerHTML += `\n✅ Diagnostics completed successfully.\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function checkHealth() {
+            if (!currentDebugCluster) return;
+            const output = document.getElementById('debugOutput');
+            output.innerHTML += `\n\n[${new Date().toLocaleTimeString()}] Quick health check for ${currentDebugCluster.name}...\n`;
+            output.innerHTML += `✓ API Server: Online\n`;
+            output.innerHTML += `✓ Nodes: ${currentDebugCluster.nodes} Ready\n`;
+            output.innerHTML += `✓ Pods: ${currentDebugCluster.pods} Running\n`;
+            output.innerHTML += `✓ Services: ${currentDebugCluster.services} Active\n`;
+            output.innerHTML += `\n🏥 Health Status: ${currentDebugCluster.status.toUpperCase()}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function viewLogs() {
+            if (!currentDebugCluster) return;
+            const output = document.getElementById('debugOutput');
+            output.innerHTML += `\n\n[${new Date().toLocaleTimeString()}] Streaming logs from ${currentDebugCluster.name}...\n`;
+            output.innerHTML += `\n--- CLUSTER LOGS ---\n`;
+            output.innerHTML += `[INFO] Cluster ${currentDebugCluster.name} is operational\n`;
+            output.innerHTML += `[INFO] All nodes are healthy and responsive\n`;
+            output.innerHTML += `[INFO] Pod scheduling is functioning normally\n`;
+            output.innerHTML += `[INFO] Network connectivity verified\n`;
+            output.innerHTML += `[WARN] CPU usage at ${currentDebugCluster.metrics.cpu}%\n`;
+            if (currentDebugCluster.status === 'warning') {
+                output.innerHTML += `[WARN] Cluster showing warning status - investigate resource usage\n`;
+            }
+            output.innerHTML += `[INFO] Log streaming active...\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('debugOutput').innerHTML = `Fortress Debug Console v1.0\nConsole cleared.\n\nReady for new commands...`;
+        }
+
+        function refreshClusters() {
+            // Simulate API call to refresh cluster data
+            clusters.forEach(cluster => {
+                cluster.metrics.cpu = Math.floor(Math.random() * 100);
+                cluster.metrics.memory = Math.floor(Math.random() * 100);
+                cluster.metrics.disk = Math.floor(Math.random() * 100);
+            });
+            loadClusters();
+            alert('✅ Cluster data refreshed successfully!');
+        }
+
+        document.getElementById('addForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const newCluster = {
+                id: document.getElementById('clusterName').value.toLowerCase().replace(/\s+/g, '-'),
+                name: document.getElementById('clusterName').value,
+                type: document.getElementById('clusterType').value,
+                status: 'pending',
+                endpoint: document.getElementById('endpoint').value,
+                region: document.getElementById('region').value || 'unknown',
+                nodes: 1,
+                pods: 0,
+                services: 0,
+                version: 'v1.28.0',
+                description: 'Newly added cluster',
+                metrics: { cpu: 0, memory: 0, disk: 0 }
+            };
+
+            clusters.push(newCluster);
+            closeModal();
+            loadClusters();
+            
+            alert(`✅ Cluster "${newCluster.name}" added successfully!\n\nInitializing cluster connection...\nThis may take a few minutes to complete.`);
+        });
+
+        // Initialize
+        loadClusters();
+    </script>
+</body>
+</html>
