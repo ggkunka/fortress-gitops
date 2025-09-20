@@ -16,10 +16,11 @@ spec:
         app: gateway-service
         component: api-gateway
     spec:
+      imagePullSecrets:
+      - name: ghcr-secret
       containers:
       - name: gateway-service
-        image: mcp-security/gateway-service:latest
-        imagePullPolicy: Never
+        image: ghcr.io/ggkunka/mcp-gateway-service:latest
         ports:
         - containerPort: 8081
         env:
