@@ -19,6 +19,8 @@ spec:
         component: frontend
         version: v1.0.0
     spec:
+      imagePullSecrets:
+      - name: ghcr-secret
       containers:
       - name: web-interface
         image: ghcr.io/ggkunka/fortress-web-functional:v1.0.0
