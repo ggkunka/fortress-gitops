@@ -1,0 +1,120 @@
+# Complete Harbor Air-Gapped Image Mirror Deployment
+
+# 1. Deploy Harbor Registry
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor-system
+
+---
+# Harbor Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-registry-data  
+  namespace: harbor-system
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Harbor Service  
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-registry
+  namespace: harbor-system
+spec:
+  selector:
+    app: harbor-registry
+  ports:
+  - name: web
+    port: 80
+    targetPort: 8080
+    nodePort: 30443
+  - name: registry
+    port: 5000
+    targetPort: 5000
+    nodePort: 30500
+  type: NodePort
+
+---
+# 2. Deploy Fortress Image Sync Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-image-service
+  namespace: harbor-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-image-service
+  template:
+    metadata:
+      labels:
+        app: fortress-image-service
+    spec:
+      containers:
+      - name: image-sync-api
+        image: python:3.11-slim
+        workingDir: /app
+        command: ["python", "fortress-image-api.py"]
+        ports:
+        - containerPort: 8001
+        env:
+        - name: HARBOR_REGISTRY
+          value: "10.63.89.182:30500"
+        - name: HARBOR_USER
+          value: "admin"
+        - name: HARBOR_PASSWORD
+          value: "Harbor12345"
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: api-code
+          mountPath: /app
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: api-code
+        configMap:
+          name: image-sync-code
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-image-service
+  namespace: harbor-system
+spec:
+  selector:
+    app: fortress-image-service
+  ports:
+  - port: 8001
+    targetPort: 8001
+
+---
+# 3. Registry Secrets for Agents
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-registry-secret
+  namespace: fortress-system
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: eyJhdXRocyI6eyIxMC42My44OS4xODI6MzA1MDAiOnsidXNlcm5hbWUiOiJhZG1pbiIsInBhc3N3b3JkIjoiSGFyYm9yMTIzNDUiLCJhdXRoIjoiWVdSdGFXNDZTR0Z5WW05eU1USXpORFU9In19fQ==
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-registry-secret
+  namespace: default
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: eyJhdXRocyI6eyIxMC42My44OS4xODI6MzA1MDAiOnsidXNlcm5hbWUiOiJhZG1pbiIsInBhc3N3b3JkIjoiSGFyYm9yMTIzNDUiLCJhdXRoIjoiWVdSdGFXNDZTR0Z5WW05eU1USXpORFU9In19fQ==

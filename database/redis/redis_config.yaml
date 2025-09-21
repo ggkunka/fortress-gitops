@@ -1,0 +1,112 @@
+# Fortress Security Platform - Redis Configuration
+
+# Redis Deployment for Caching & Queues
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-redis
+  namespace: fortress-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-redis
+  template:
+    metadata:
+      labels:
+        app: fortress-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server"]
+        args: 
+        - "--appendonly yes"
+        - "--maxmemory 2gb"
+        - "--maxmemory-policy allkeys-lru"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: fortress-redis-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fortress-redis-pvc
+  namespace: fortress-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-redis
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
+# Redis ConfigMap for Key Patterns
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-key-patterns
+  namespace: fortress-system
+data:
+  key_patterns.txt: |
+    # Fortress Security Redis Key Patterns
+    
+    # Scan Queue Management
+    scan:queue:high_priority     → List of high priority scan tasks
+    scan:queue:medium_priority   → List of medium priority scan tasks  
+    scan:queue:low_priority      → List of low priority scan tasks
+    scan:active:{cluster_id}     → Set of active scan execution IDs
+    scan:results:{execution_id}  → Hash of scan results cache
+    
+    # Performance Monitoring
+    performance:metrics:{cluster_id}:{namespace} → Hash of real-time metrics
+    performance:baseline:{cluster_id}            → Hash of performance baseline
+    performance:alerts:{cluster_id}              → List of performance alerts
+    
+    # Security Session Management  
+    user:session:{user_id}       → Hash of user session data
+    user:permissions:{user_id}   → Set of user permissions
+    tenant:access:{tenant_id}    → Set of users with tenant access
+    
+    # Threat Intelligence Cache
+    threat:ioc:{hash}           → Hash of IOC threat intelligence
+    threat:signatures:{type}    → Set of threat detection signatures
+    vuln:cache:{cve_id}        → Hash of cached vulnerability data
+    
+    # Agent Coordination
+    agent:heartbeat:{agent_id}  → String timestamp of last heartbeat
+    agent:tasks:{agent_id}      → List of pending tasks for agent
+    agent:status:{agent_id}     → Hash of agent status information
+    
+    # Harbor Image Cache
+    harbor:sync:status:{image}  → String status of image sync
+    harbor:images:available     → Set of available images in harbor
+    harbor:pull:queue          → List of images queued for sync

@@ -1,0 +1,185 @@
+# Fortress Security Database Stack - Phase 1 Deployment
+
+# PostgreSQL Database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fortress-postgresql
+  namespace: fortress-system
+spec:
+  serviceName: fortress-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-postgresql
+  template:
+    metadata:
+      labels:
+        app: fortress-postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "fortress_security"
+        - name: POSTGRES_USER
+          value: "fortress_user"
+        - name: POSTGRES_PASSWORD
+          value: "fortress_secure_password"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-postgresql
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+  type: ClusterIP
+
+---
+# Elasticsearch Deployment
+apiVersion: apps/v1
+kind: StatefulSet  
+metadata:
+  name: fortress-elasticsearch
+  namespace: fortress-system
+spec:
+  serviceName: fortress-elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-elasticsearch
+  template:
+    metadata:
+      labels:
+        app: fortress-elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+        - containerPort: 9200
+        - containerPort: 9300
+        env:
+        - name: discovery.type
+          value: "single-node"
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: xpack.security.enabled
+          value: "false"
+        volumeMounts:
+        - name: es-data
+          mountPath: /usr/share/elasticsearch/data
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "1000m"
+          limits:
+            memory: "6Gi"
+            cpu: "2000m"
+  volumeClaimTemplates:
+  - metadata:
+      name: es-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-elasticsearch
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-elasticsearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+  type: ClusterIP
+
+---
+# ConfigMap for PostgreSQL init scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: fortress-system
+data:
+  01-create-extensions.sql: |
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+  02-create-tables.sql: |
+    -- Core Infrastructure Tables
+    CREATE TABLE clusters (
+        cluster_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        cluster_name VARCHAR(255) NOT NULL UNIQUE,
+        api_endpoint VARCHAR(500) NOT NULL,
+        security_posture_score FLOAT DEFAULT 0.0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    CREATE TABLE namespaces (
+        namespace_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        cluster_id UUID REFERENCES clusters(cluster_id) ON DELETE CASCADE,
+        namespace_name VARCHAR(255) NOT NULL,
+        tenant_id VARCHAR(255),
+        risk_score FLOAT DEFAULT 0.0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(cluster_id, namespace_name)
+    );
+    
+    CREATE TABLE workloads (
+        workload_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        namespace_id UUID REFERENCES namespaces(namespace_id) ON DELETE CASCADE,
+        workload_name VARCHAR(255) NOT NULL,
+        workload_type VARCHAR(50) NOT NULL,
+        image_list TEXT[],
+        vulnerability_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+    );
+  03-create-indexes.sql: |
+    -- Performance Indexes
+    CREATE INDEX idx_clusters_name ON clusters(cluster_name);
+    CREATE INDEX idx_namespaces_tenant ON namespaces(tenant_id);
+    CREATE INDEX idx_workloads_type ON workloads(workload_type);
+    CREATE INDEX idx_vulnerabilities_severity ON vulnerabilities(severity) WHERE severity IN ('HIGH', 'CRITICAL');
+    CREATE INDEX idx_scan_executions_status ON scan_executions(scan_status, created_at);
+    CREATE INDEX idx_cve_severity ON cve_database(severity, cvss_v3_score);

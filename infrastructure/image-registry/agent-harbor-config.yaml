@@ -1,0 +1,69 @@
+# Harbor Registry Configuration for Fortress Agents
+
+# 1. Create Harbor Registry Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-registry-secret
+  namespace: fortress-system
+type: kubernetes.io/dockerconfigjson
+data:
+  # Base64 encoded: {"auths":{"10.63.89.182:30500":{"username":"admin","password":"Harbor12345","auth":"YWRtaW46SGFyYm9yMTIzNDU="}}}
+  .dockerconfigjson: eyJhdXRocyI6eyIxMC42My44OS4xODI6MzA1MDAiOnsidXNlcm5hbWUiOiJhZG1pbiIsInBhc3N3b3JkIjoiSGFyYm9yMTIzNDUiLCJhdXRoIjoiWVdSdGFXNDZTR0Z5WW05eU1USXpORFU9In19fQ==
+
+---
+# 2. Updated Fortress Agent Deployment with Harbor Images
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-agent
+  template:
+    metadata:
+      labels:
+        app: fortress-agent
+    spec:
+      serviceAccountName: fortress-agent
+      imagePullSecrets:
+      - name: harbor-registry-secret  # Harbor authentication
+      containers:
+      - name: fortress-agent
+        image: 10.63.89.182:30500/security/fortress-agent:latest  # Harbor registry
+        ports:
+        - containerPort: 8000
+        env:
+        - name: KUBECONFIG
+          value: "/tmp/service-account/kubeconfig"
+        - name: FORTRESS_REGISTRY
+          value: "10.63.89.182:30500"  # Harbor registry for tool images
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: service-account-token
+          mountPath: /tmp/service-account
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+
+---
+# 3. Image Pull Secret for Scanner Jobs  
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-registry-secret
+  namespace: default  # Scanner jobs run in default namespace
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: eyJhdXRocyI6eyIxMC42My44OS4xODI6MzA1MDAiOnsidXNlcm5hbWUiOiJhZG1pbiIsInBhc3N3b3JkIjoiSGFyYm9yMTIzNDUiLCJhdXRoIjoiWVdSdGFXNDZTR0Z5WW05eU1USXpORFU9In19fQ==

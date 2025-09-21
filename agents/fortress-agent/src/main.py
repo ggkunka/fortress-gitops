@@ -4,9 +4,13 @@ Fortress Dynamic Security Agent - On-Demand Tool Orchestrator
 """
 
 import asyncio
-import json
+import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import uuid
+import os
+import requests
+import time
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from kubernetes import client, config
@@ -29,31 +33,108 @@ class FortressAgent:
         self.k8s_core = client.CoreV1Api()
         self.active_scans = {}
         
-    async def execute_scan(self, scan_request: ScanRequest):
-        """Execute on-demand security scan"""
+    async def request_harbor_image(self, tool_name: str) -> str:
+        """Request image from Fortress Harbor service"""
         try:
-            job_manifest = self.generate_job_manifest(scan_request)
+            response = requests.post(
+                f"{FORTRESS_IMAGE_API}/request-image",
+                json={"tool_name": tool_name, "agent_id": "fortress-agent-001"}
+            )
             
-            # Create Kubernetes Job
-            job = self.k8s_batch.create_namespaced_job(
+            if response.status_code == 200:
+                data = response.json()
+                request_id = data["request_id"]
+                
+                # Wait for sync completion
+                harbor_image = await self.wait_for_harbor_sync(request_id)
+                return harbor_image
+            else:
+                raise Exception(f"Image request failed: {response.status_code}")
+                
+        except Exception as e:
+            logger.error(f"Failed to request Harbor image for {tool_name}: {e}")
+            raise
+    
+    async def wait_for_harbor_sync(self, request_id: str, timeout: int = 300) -> str:
+        """Wait for Harbor image sync to complete"""
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            try:
+                response = requests.get(f"{FORTRESS_IMAGE_API}/status/{request_id}")
+                
+                if response.status_code == 200:
+                    status = response.json()
+                    
+                    if status["status"] == "ready":
+                        return status["harbor_image"]
+                    elif status["status"] == "failed":
+                        raise Exception(f"Harbor sync failed: {status.get('error')}")
+                    
+                await asyncio.sleep(10)
+                
+            except Exception as e:
+                logger.error(f"Error checking Harbor sync status: {e}")
+                await asyncio.sleep(10)
+        
+        raise Exception("Harbor image sync timeout")
+
+    async def execute_scan(self, scan_request: ScanRequest):
+        """Execute security scan with on-demand Harbor image"""
+        scan_id = scan_request.scan_id
+        tool_name = scan_request.tool_name
+        
+        logger.info(f"Starting scan {scan_id} with tool {tool_name}")
+        
+        try:
+            # Step 1: Request image from Harbor
+            logger.info(f"Requesting {tool_name} image from Harbor...")
+            harbor_image = await self.request_harbor_image(tool_name)
+            
+            # Step 2: Generate unique job name
+            job_name = f"fortress-{tool_name}-{scan_id}-{int(time.time())}"
+            
+            # Step 3: Generate job manifest with Harbor image
+            job_manifest = self.generate_job_manifest(scan_request, harbor_image)
+            
+            if not job_manifest:
+                logger.error(f"Failed to generate job manifest for {tool_name}")
+                return
+            
+            # Step 4: Create the job
+            self.k8s_batch.create_namespaced_job(
                 namespace=scan_request.target_namespace,
                 body=job_manifest
             )
             
-            self.active_scans[scan_request.scan_id] = {
-                "job_name": job.metadata.name,
-                "status": "running",
-                "start_time": datetime.now()
-            }
+            logger.info(f"Created scan job: {job_name} with Harbor image: {harbor_image}")
             
-            logger.info(f"Started scan {scan_request.scan_id} with tool {scan_request.tool_name}")
-            return {"status": "started", "job_name": job.metadata.name}
+            # Step 5: Monitor job and cleanup after completion
+            await self.monitor_and_cleanup_job(job_name)
             
         except Exception as e:
-            logger.error(f"Failed to start scan: {e}")
+            logger.error(f"Failed to execute scan {scan_id}: {e}")
+    
+    async def monitor_and_cleanup_job(self, job_name: str):
+        """Monitor job completion and cleanup resources"""
+        try:
+            # Wait for job completion (simplified monitoring)
+            await asyncio.sleep(300)  # Wait 5 minutes for completion
+            
+            # Delete the job
+            self.k8s_batch.delete_namespaced_job(
+                name=job_name,
+                namespace="default",
+                propagation_policy="Background"
+            )
+            
+            logger.info(f"Cleaned up job: {job_name}")
+            
+        except Exception as e:
+            logger.error(f"Failed to cleanup job {job_name}: {e}")
             return {"status": "failed", "error": str(e)}
     
-    def generate_job_manifest(self, scan_request: ScanRequest) -> Dict[str, Any]:
+    def generate_job_manifest(self, scan_request: ScanRequest, harbor_image: str) -> Dict[str, Any]:
         """Generate job manifest based on tool type"""
         
         tool_configs = {
@@ -67,8 +148,12 @@ class FortressAgent:
                 "command": ["grype", scan_request.target_identifier, "-o", "json"]
             },
             "trivy": {
-                "image": "aquasec/trivy:latest",
-                "command": ["trivy", "image", scan_request.target_identifier, "--format", "json"]
+                "image": harbor_image,  # Use Harbor image instead of Docker Hub
+                "command": ["trivy", "image", "--format", "json", scan_request.target_identifier],
+                "security_context": {
+                    "allowPrivilegeEscalation": False,
+                    "readOnlyRootFilesystem": True
+                }
             },
             "dockle": {
                 "image": "goodwithtech/dockle:latest",
@@ -222,6 +307,9 @@ class FortressAgent:
                 "template": {
                     "spec": {
                         "serviceAccountName": "fortress-scanner",
+                        "imagePullSecrets": [
+                            {"name": "harbor-registry-secret"}
+                        ],
                         "restartPolicy": "Never",
                         "hostNetwork": config.get("host_network", False),
                         "hostPID": config.get("host_pid", False),
@@ -247,11 +335,18 @@ class FortressAgent:
                     }
                 },
                 "backoffLimit": 1
-            }
         }
+    }
 
 # FastAPI Application
 app = FastAPI(title="Fortress Dynamic Security Agent", version="1.0.0")
+
+# Configuration
+KUBECONFIG_PATH = os.getenv("KUBECONFIG", "/tmp/service-account/kubeconfig")
+FORTRESS_NAMESPACE = os.getenv("FORTRESS_NAMESPACE", "fortress-system")
+FORTRESS_IMAGE_API = os.getenv("FORTRESS_IMAGE_API", "http://fortress-image-service:8001")
+HARBOR_REGISTRY = os.getenv("HARBOR_REGISTRY", "10.63.89.182:30500")
+
 agent = FortressAgent()
 
 @app.post("/scan/execute")
