@@ -1,5 +1,50 @@
 # Fortress Security Database Stack - Phase 1 Deployment
 
+# Redis Cache & Queue
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-redis
+  namespace: fortress-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-redis
+  template:
+    metadata:
+      labels:
+        app: fortress-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-redis
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
 # PostgreSQL Database
 apiVersion: apps/v1
 kind: StatefulSet
