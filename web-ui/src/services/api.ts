@@ -33,6 +33,7 @@ class ApiService {
 
   constructor() {
     this.axiosInstance = axios.create({
+      baseURL: API_BASE,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -88,126 +89,123 @@ class ApiService {
 
   // Authentication APIs
   async login(credentials: { username: string; password: string }) {
-    const response = await this.axiosInstance.post(`${API_BASE}/auth/login`, credentials);
+    const response = await this.axiosInstance.post('/auth/login', credentials);
     return response.data;
   }
 
   async logout() {
-    const response = await this.axiosInstance.post(`${API_BASE}/auth/logout`);
+    const response = await this.axiosInstance.post('/auth/logout');
     localStorage.removeItem('fortress_token');
     return response.data;
   }
 
   async getCurrentUser() {
-    const response = await this.axiosInstance.get(`${API_BASE}/auth/me`);
+    const response = await this.axiosInstance.get('/auth/me');
     return response.data;
   }
 
   // Security Dashboard APIs
   getSecurityOverview = async () => {
-    const response = await this.axiosInstance.get(`${API_BASE}/dashboard/overview`);
+    const response = await this.axiosInstance.get('/dashboard/overview');
     return response.data;
   };
 
   getSecurityMetrics = async () => {
-    const response = await this.axiosInstance.get(`${API_BASE}/dashboard/metrics`);
+    const response = await this.axiosInstance.get('/dashboard/metrics');
     return response.data;
   };
 
   getThreatDetectionData = async () => {
-    const response = await this.axiosInstance.get(`${API_BASE}/threats/detection`);
+    const response = await this.axiosInstance.get('/threats/detection');
     return response.data;
   };
 
   // Cluster Management APIs
   getClusters = async () => {
-    const response = await this.axiosInstance.get(`${API_BASE}/clusters`);
+    const response = await this.axiosInstance.get('/clusters');
     return response.data;
   };
 
   async getClusterDetails(clusterId: string) {
-    const response = await this.axiosInstance.get(`${API_BASE}/clusters/${clusterId}`);
+    const response = await this.axiosInstance.get(`/clusters/${clusterId}`);
     return response.data;
   }
 
   getPods = async (clusterId?: string) => {
-    const url = clusterId ? `${API_BASE}/clusters/${clusterId}/pods` : `${API_BASE}/pods`;
+    const url = clusterId ? `/clusters/${clusterId}/pods` : '/pods';
     const response = await this.axiosInstance.get(url);
     return response.data;
   };
 
   getServices = async (clusterId?: string) => {
-    const url = clusterId ? `${API_BASE}/clusters/${clusterId}/services` : `${API_BASE}/services`;
+    const url = clusterId ? `/clusters/${clusterId}/services` : '/services';
     const response = await this.axiosInstance.get(url);
     return response.data;
   };
 
   async createPod(clusterId: string, podSpec: any) {
-    const response = await this.axiosInstance.post(
-      `${API_BASE}/clusters/${clusterId}/pods`,
-      podSpec
-    );
+    const response = await this.axiosInstance.post(`/clusters/${clusterId}/pods`, podSpec);
     return response.data;
   }
 
   async deletePod(clusterId: string, podName: string, namespace: string) {
     const response = await this.axiosInstance.delete(
-      `${API_BASE}/clusters/${clusterId}/pods/${podName}?namespace=${namespace}`
+      `/clusters/${clusterId}/pods/${podName}?namespace=${namespace}`
     );
     return response.data;
   }
 
   // Vulnerability Management APIs
   getVulnerabilities = async () => {
-    const response = await this.axiosInstance.get(`${API_BASE}/vulnerabilities`);
+    const response = await this.axiosInstance.get('/vulnerabilities');
     return response.data;
   };
 
   async getVulnerabilityDetails(cveId: string) {
-    const response = await this.axiosInstance.get(`${API_BASE}/vulnerabilities/${cveId}`);
+    const response = await this.axiosInstance.get(`/vulnerabilities/${cveId}`);
     return response.data;
   }
 
   scanCluster = async (clusterId: string) => {
-    const response = await this.axiosInstance.post(`${API_BASE}/scan/cluster/${clusterId}`);
+    const response = await this.axiosInstance.post(`/scan/cluster/${clusterId}`);
     return response.data;
   };
 
   async getScanResults(scanId: string) {
-    const response = await this.axiosInstance.get(`${API_BASE}/scan/results/${scanId}`);
+    const response = await this.axiosInstance.get(`/scan/results/${scanId}`);
     return response.data;
   }
 
   // Compliance APIs
   async getComplianceStatus() {
-    const response = await this.axiosInstance.get(`${API_BASE}/compliance/status`);
+    const response = await this.axiosInstance.get(`/compliance/status`);
     return response.data;
   }
 
   async getComplianceFrameworks() {
-    const response = await this.axiosInstance.get(`${API_BASE}/compliance/frameworks`);
+    const response = await this.axiosInstance.get(`/compliance/frameworks`);
     return response.data;
   }
 
   async runComplianceAssessment(frameworkId: string) {
-    const response = await this.axiosInstance.post(`${API_BASE}/compliance/assess/${frameworkId}`);
+    const response = await this.axiosInstance.post(`/compliance/assess/${frameworkId}`);
     return response.data;
   }
 
   // Reports APIs
   async getReports() {
-    const response = await this.axiosInstance.get(`${API_BASE}/reports`);
+    const response = await this.axiosInstance.get(`/reports`);
     return response.data;
   }
 
   async generateReport(reportConfig: any) {
-    const response = await this.axiosInstance.post(`${API_BASE}/reports/generate`, reportConfig);
+    const response = await this.axiosInstance.post(`/reports/generate`, reportConfig);
     return response.data;
   }
 
   async downloadReport(reportId: string, format: string) {
     const response = await this.axiosInstance.get(
-      `${API_BASE}/reports/${reportId}/download?format=${format}`,
+      `/reports/${reportId}/download?format=${format}`,
       { responseType: 'blob' }
     );
     return response.data;
@@ -215,88 +213,81 @@ class ApiService {
 
   // Integration Management APIs
   async getIntegrations() {
-    const response = await this.axiosInstance.get(`${API_BASE}/integrations`);
+    const response = await this.axiosInstance.get(`/integrations`);
     return response.data;
   }
 
   async getIntegrationStatus(integrationId: string) {
-    const response = await this.axiosInstance.get(
-      `${API_BASE}/integrations/${integrationId}/status`
-    );
+    const response = await this.axiosInstance.get(`/integrations/${integrationId}/status`);
     return response.data;
   }
 
   async testIntegration(integrationId: string) {
-    const response = await this.axiosInstance.post(
-      `${API_BASE}/integrations/${integrationId}/test`
-    );
+    const response = await this.axiosInstance.post(`/integrations/${integrationId}/test`);
     return response.data;
   }
 
   async configureIntegration(integrationId: string, config: any) {
-    const response = await this.axiosInstance.put(
-      `${API_BASE}/integrations/${integrationId}/config`,
-      config
-    );
+    const response = await this.axiosInstance.put(`/integrations/${integrationId}/config`, config);
     return response.data;
   }
 
   // User Management APIs
   async getUsers() {
-    const response = await this.axiosInstance.get(`${API_BASE}/users`);
+    const response = await this.axiosInstance.get(`/users`);
     return response.data;
   }
 
   async createUser(userData: any) {
-    const response = await this.axiosInstance.post(`${API_BASE}/users`, userData);
+    const response = await this.axiosInstance.post(`/users`, userData);
     return response.data;
   }
 
   async updateUser(userId: string, userData: any) {
-    const response = await this.axiosInstance.put(`${API_BASE}/users/${userId}`, userData);
+    const response = await this.axiosInstance.put(`/users/${userId}`, userData);
     return response.data;
   }
 
   async deleteUser(userId: string) {
-    const response = await this.axiosInstance.delete(`${API_BASE}/users/${userId}`);
+    const response = await this.axiosInstance.delete(`/users/${userId}`);
     return response.data;
   }
 
   async getRoles() {
-    const response = await this.axiosInstance.get(`${API_BASE}/roles`);
+    const response = await this.axiosInstance.get(`/roles`);
     return response.data;
   }
 
   // ML Engine APIs
   async getAnomalyDetection() {
-    const response = await this.axiosInstance.get(`${API_BASE}/ml/anomalies`);
+    const response = await this.axiosInstance.get(`/ml/anomalies`);
     return response.data;
   }
 
   async getThreatIntelligence() {
-    const response = await this.axiosInstance.get(`${API_BASE}/ml/threat-intel`);
+    const response = await this.axiosInstance.get(`/ml/threat-intel`);
     return response.data;
   }
 
   async getRiskAssessment() {
-    const response = await this.axiosInstance.get(`${API_BASE}/ml/risk-assessment`);
+    const response = await this.axiosInstance.get(`/ml/risk-assessment`);
     return response.data;
   }
 
   // SIEM Integration APIs
   async getSiemEvents() {
-    const response = await this.axiosInstance.get(`${API_BASE}/siem/events`);
+    const response = await this.axiosInstance.get(`/siem/events`);
     return response.data;
   }
 
   async forwardEventToSiem(event: any) {
-    const response = await this.axiosInstance.post(`${API_BASE}/siem/forward`, event);
+    const response = await this.axiosInstance.post(`/siem/forward`, event);
     return response.data;
   }
 
   // GraphQL Query
   async graphqlQuery(query: string, variables?: any) {
-    const response = await this.axiosInstance.post(`${API_BASE}/graphql`, {
+    const response = await this.axiosInstance.post(`/graphql`, {
       query,
       variables,
     });
@@ -306,7 +297,7 @@ class ApiService {
   // Health Check
   async healthCheck() {
     try {
-      const response = await this.axiosInstance.get(`${API_BASE}/health`);
+      const response = await this.axiosInstance.get(`/health`);
       return response.data;
     } catch (error) {
       return { status: 'error', message: 'Service unavailable' };
