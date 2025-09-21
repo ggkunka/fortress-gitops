@@ -164,7 +164,9 @@ class ReportsAPI {
   /**
    * Create report template
    */
-  public async createReportTemplate(templateData: Partial<ReportTemplate>): Promise<ReportTemplate> {
+  public async createReportTemplate(
+    templateData: Partial<ReportTemplate>
+  ): Promise<ReportTemplate> {
     return apiClient.post<ReportTemplate>('/reports/templates', templateData);
   }
 
@@ -172,7 +174,7 @@ class ReportsAPI {
    * Update report template
    */
   public async updateReportTemplate(
-    templateId: string, 
+    templateId: string,
     updates: Partial<ReportTemplate>
   ): Promise<ReportTemplate> {
     return apiClient.patch<ReportTemplate>(`/reports/templates/${templateId}`, updates);

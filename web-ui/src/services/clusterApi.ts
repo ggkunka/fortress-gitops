@@ -13,31 +13,36 @@ export class ClusterApi {
   // Cluster Management
   async getClusters(): Promise<ClusterConfig[]> {
     const response = await apiClient.get<ApiResponse<ClusterConfig[]>>(this.baseUrl);
-    return response.data.data || [];
+    return response.data || [];
   }
 
   async getCluster(id: string): Promise<ClusterConfig> {
     const response = await apiClient.get<ApiResponse<ClusterConfig>>(`${this.baseUrl}/${id}`);
-    if (!response.data.data) {
+    if (!response.data) {
       throw new Error('Cluster not found');
     }
-    return response.data.data;
+    return response.data;
   }
 
-  async createCluster(cluster: Omit<ClusterConfig, 'id' | 'status' | 'lastConnected' | 'metadata'>): Promise<ClusterConfig> {
+  async createCluster(
+    cluster: Omit<ClusterConfig, 'id' | 'status' | 'lastConnected' | 'metadata'>
+  ): Promise<ClusterConfig> {
     const response = await apiClient.post<ApiResponse<ClusterConfig>>(this.baseUrl, cluster);
-    if (!response.data.data) {
+    if (!response.data) {
       throw new Error('Failed to create cluster');
     }
-    return response.data.data;
+    return response.data;
   }
 
   async updateCluster(id: string, cluster: Partial<ClusterConfig>): Promise<ClusterConfig> {
-    const response = await apiClient.put<ApiResponse<ClusterConfig>>(`${this.baseUrl}/${id}`, cluster);
-    if (!response.data.data) {
+    const response = await apiClient.put<ApiResponse<ClusterConfig>>(
+      `${this.baseUrl}/${id}`,
+      cluster
+    );
+    if (!response.data) {
       throw new Error('Failed to update cluster');
     }
-    return response.data.data;
+    return response.data;
   }
 
   async deleteCluster(id: string): Promise<void> {
@@ -46,38 +51,41 @@ export class ClusterApi {
 
   // Cluster Connectivity
   async testConnection(id: string): Promise<{ success: boolean; message: string; details?: any }> {
-    const response = await apiClient.post<ApiResponse<{ success: boolean; message: string; details?: any }>>(
-      `${this.baseUrl}/${id}/test-connection`
-    );
-    return response.data.data || { success: false, message: 'Unknown error' };
+    const response = await apiClient.post<
+      ApiResponse<{ success: boolean; message: string; details?: any }>
+    >(`${this.baseUrl}/${id}/test-connection`);
+    return response.data || { success: false, message: 'Unknown error' };
   }
 
-  async testConnectionConfig(config: ClusterAuthentication & { endpoint: string }): Promise<{ success: boolean; message: string; details?: any }> {
-    const response = await apiClient.post<ApiResponse<{ success: boolean; message: string; details?: any }>>(
-      `${this.baseUrl}/test-connection`,
-      config
-    );
-    return response.data.data || { success: false, message: 'Unknown error' };
+  async testConnectionConfig(
+    config: ClusterAuthentication & { endpoint: string }
+  ): Promise<{ success: boolean; message: string; details?: any }> {
+    const response = await apiClient.post<
+      ApiResponse<{ success: boolean; message: string; details?: any }>
+    >(`${this.baseUrl}/test-connection`, config);
+    return response.data || { success: false, message: 'Unknown error' };
   }
 
   // Cluster Status and Monitoring
   async getClusterStatus(id: string): Promise<ClusterStatus> {
-    const response = await apiClient.get<ApiResponse<ClusterStatus>>(`${this.baseUrl}/${id}/status`);
-    if (!response.data.data) {
+    const response = await apiClient.get<ApiResponse<ClusterStatus>>(
+      `${this.baseUrl}/${id}/status`
+    );
+    if (!response.data) {
       throw new Error('Failed to get cluster status');
     }
-    return response.data.data;
+    return response.data;
   }
 
   async getClusterStatuses(): Promise<ClusterStatus[]> {
     const response = await apiClient.get<ApiResponse<ClusterStatus[]>>(`${this.baseUrl}/status`);
-    return response.data.data || [];
+    return response.data || [];
   }
 
   // Namespace Operations
   async getNamespaces(id: string): Promise<string[]> {
     const response = await apiClient.get<ApiResponse<string[]>>(`${this.baseUrl}/${id}/namespaces`);
-    return response.data.data || [];
+    return response.data || [];
   }
 
   async createNamespace(id: string, namespace: string): Promise<void> {
@@ -91,56 +99,69 @@ export class ClusterApi {
   // Resource Operations
   async getResources(id: string, namespace?: string): Promise<any[]> {
     const params = namespace ? { namespace } : {};
-    const response = await apiClient.get<ApiResponse<any[]>>(`${this.baseUrl}/${id}/resources`, { params });
-    return response.data.data || [];
+    const response = await apiClient.get<ApiResponse<any[]>>(`${this.baseUrl}/${id}/resources`, {
+      params,
+    });
+    return response.data || [];
   }
 
-  async getResource(id: string, resourceType: string, resourceName: string, namespace?: string): Promise<any> {
+  async getResource(
+    id: string,
+    resourceType: string,
+    resourceName: string,
+    namespace?: string
+  ): Promise<any> {
     const params = namespace ? { namespace } : {};
     const response = await apiClient.get<ApiResponse<any>>(
       `${this.baseUrl}/${id}/resources/${resourceType}/${resourceName}`,
       { params }
     );
-    return response.data.data;
+    return response.data;
   }
 
   // Kubeconfig Operations
   async generateKubeconfig(id: string): Promise<string> {
-    const response = await apiClient.get<ApiResponse<{ kubeconfig: string }>>(`${this.baseUrl}/${id}/kubeconfig`);
-    return response.data.data?.kubeconfig || '';
+    const response = await apiClient.get<ApiResponse<{ kubeconfig: string }>>(
+      `${this.baseUrl}/${id}/kubeconfig`
+    );
+    return response.data?.kubeconfig || '';
   }
 
-  async validateKubeconfig(kubeconfig: string): Promise<{ valid: boolean; message: string; clusters?: string[] }> {
-    const response = await apiClient.post<ApiResponse<{ valid: boolean; message: string; clusters?: string[] }>>(
-      `${this.baseUrl}/validate-kubeconfig`,
-      { kubeconfig }
-    );
-    return response.data.data || { valid: false, message: 'Unknown error' };
+  async validateKubeconfig(
+    kubeconfig: string
+  ): Promise<{ valid: boolean; message: string; clusters?: string[] }> {
+    const response = await apiClient.post<
+      ApiResponse<{ valid: boolean; message: string; clusters?: string[] }>
+    >(`${this.baseUrl}/validate-kubeconfig`, { kubeconfig });
+    return response.data || { valid: false, message: 'Unknown error' };
   }
 
   // Bulk Operations
-  async bulkOperation(clusterIds: string[], operation: string, params?: any): Promise<{ [clusterId: string]: { success: boolean; message: string } }> {
-    const response = await apiClient.post<ApiResponse<{ [clusterId: string]: { success: boolean; message: string } }>>(
-      `${this.baseUrl}/bulk-operation`,
-      { clusterIds, operation, params }
-    );
-    return response.data.data || {};
+  async bulkOperation(
+    clusterIds: string[],
+    operation: string,
+    params?: any
+  ): Promise<{ [clusterId: string]: { success: boolean; message: string } }> {
+    const response = await apiClient.post<
+      ApiResponse<{ [clusterId: string]: { success: boolean; message: string } }>
+    >(`${this.baseUrl}/bulk-operation`, { clusterIds, operation, params });
+    return response.data || {};
   }
 
   // Cluster Events
   async getClusterEvents(id: string, limit = 100): Promise<any[]> {
     const response = await apiClient.get<ApiResponse<any[]>>(`${this.baseUrl}/${id}/events`, {
-      params: { limit }
+      params: { limit },
     });
-    return response.data.data || [];
+    return response.data || [];
   }
 
   // Cluster Metrics
   async getClusterMetrics(id: string, timeRange = '1h'): Promise<any> {
     const response = await apiClient.get<ApiResponse<any>>(`${this.baseUrl}/${id}/metrics`, {
-      params: { timeRange }
+      params: { timeRange },
     });
-    return response.data.data;
+    return response.data;
   }
 
   // Security Scanning
@@ -149,14 +170,14 @@ export class ClusterApi {
       `${this.baseUrl}/${id}/scan`,
       { scanType }
     );
-    return response.data.data || { scanId: '' };
+    return response.data || { scanId: '' };
   }
 
   async getClusterScanResults(id: string, limit = 50): Promise<any[]> {
     const response = await apiClient.get<ApiResponse<any[]>>(`${this.baseUrl}/${id}/scan-results`, {
-      params: { limit }
+      params: { limit },
     });
-    return response.data.data || [];
+    return response.data || [];
   }
 }
 

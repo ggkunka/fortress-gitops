@@ -232,7 +232,12 @@ export interface RetentionPolicy {
 export interface SecurityAgent {
   id: string;
   name: string;
-  type: 'vulnerability-scanner' | 'compliance-checker' | 'runtime-security' | 'network-policy' | 'admission-controller';
+  type:
+    | 'vulnerability-scanner'
+    | 'compliance-checker'
+    | 'runtime-security'
+    | 'network-policy'
+    | 'admission-controller';
   description: string;
   helmChart: HelmChart;
   configuration: AgentConfiguration;

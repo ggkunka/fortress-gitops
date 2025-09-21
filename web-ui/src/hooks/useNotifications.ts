@@ -37,18 +37,14 @@ export const useNotifications = () => {
     },
   ]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read: true }))
-    );
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
@@ -58,11 +54,11 @@ export const useNotifications = () => {
       timestamp: new Date(),
       read: false,
     };
-    setNotifications(prev => [newNotification, ...prev]);
+    setNotifications((prev) => [newNotification, ...prev]);
   };
 
   const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   return {

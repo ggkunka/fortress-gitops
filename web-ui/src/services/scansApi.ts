@@ -159,13 +159,15 @@ class ScansAPI {
   /**
    * Get available scan types and configurations
    */
-  public async getScanTypes(): Promise<{
-    type: string;
-    name: string;
-    description: string;
-    required_fields: string[];
-    optional_fields: string[];
-  }[]> {
+  public async getScanTypes(): Promise<
+    {
+      type: string;
+      name: string;
+      description: string;
+      required_fields: string[];
+      optional_fields: string[];
+    }[]
+  > {
     return apiClient.get<any>('/scans/types');
   }
 }

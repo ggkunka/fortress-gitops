@@ -145,7 +145,7 @@ export const AppLayout: React.FC = () => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  const unreadNotifications = notifications?.filter(n => !n.read).length || 0;
+  const unreadNotifications = notifications?.filter((n) => !n.read).length || 0;
 
   const drawer = (
     <Box>
@@ -191,7 +191,7 @@ export const AppLayout: React.FC = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      
+
       {/* App Bar */}
       <AppBar
         position="fixed"
@@ -210,9 +210,10 @@ export const AppLayout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {navigationItems.find(item => isActivePath(item.path))?.label || 'Fortress Security Platform'}
+            {navigationItems.find((item) => isActivePath(item.path))?.label ||
+              'Fortress Security Platform'}
           </Typography>
 
           {/* Notifications */}
@@ -232,9 +233,7 @@ export const AppLayout: React.FC = () => {
             onClick={handleMenuOpen}
             color="inherit"
           >
-            <Avatar
-              sx={{ width: 32, height: 32, bgcolor: theme.palette.secondary.main }}
-            >
+            <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.secondary.main }}>
               {user?.first_name?.[0] || user?.username?.[0] || 'U'}
             </Avatar>
           </IconButton>
@@ -309,7 +308,7 @@ export const AppLayout: React.FC = () => {
         >
           {drawer}
         </Drawer>
-        
+
         {/* Desktop drawer */}
         <Drawer
           variant="permanent"

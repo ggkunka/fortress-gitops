@@ -96,15 +96,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       const token = localStorage.getItem('auth_token');
       const userStr = localStorage.getItem('auth_user');
-      
+
       if (token && userStr) {
         try {
           const user = JSON.parse(userStr);
-          
+
           // Verify token is still valid
           authApi.setAuthToken(token);
           await authApi.getCurrentUser();
-          
+
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: {
@@ -132,20 +132,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string): Promise<void> => {
     dispatch({ type: 'AUTH_START' });
-    
+
     try {
       const response = await authApi.login(username, password);
-      
+
       // Store tokens and user info
       localStorage.setItem('auth_token', response.access_token);
       if (response.refresh_token) {
         localStorage.setItem('refresh_token', response.refresh_token);
       }
       localStorage.setItem('auth_user', JSON.stringify(response.user));
-      
+
       // Set auth token for future requests
       authApi.setAuthToken(response.access_token);
-      
+
       dispatch({ type: 'AUTH_SUCCESS', payload: response });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error?.message || 'Login failed';
@@ -168,33 +168,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('auth_user');
-      
+
       // Clear auth token from API client
       authApi.setAuthToken(null);
-      
+
       dispatch({ type: 'AUTH_LOGOUT' });
     }
   };
 
   const refreshToken = async (): Promise<void> => {
     const refreshTokenValue = localStorage.getItem('refresh_token');
-    
+
     if (!refreshTokenValue) {
       throw new Error('No refresh token available');
     }
 
     try {
       const response = await authApi.refreshToken(refreshTokenValue);
-      
+
       // Update stored tokens
       localStorage.setItem('auth_token', response.access_token);
       if (response.refresh_token) {
         localStorage.setItem('refresh_token', response.refresh_token);
       }
-      
+
       // Set new auth token
       authApi.setAuthToken(response.access_token);
-      
+
       dispatch({ type: 'AUTH_SUCCESS', payload: response });
     } catch (error) {
       // Refresh failed, logout user

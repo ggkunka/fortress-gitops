@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: mcp-security
+  labels:
+    app: neo4j
+    component: graph-database
+spec:
+  serviceName: neo4j
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neo4j
+  template:
+    metadata:
+      labels:
+        app: neo4j
+        component: graph-database
+    spec:
+      containers:
+      - name: neo4j
+        image: neo4j:5.15-community
+        ports:
+        - containerPort: 7474
+          name: http
+        - containerPort: 7687
+          name: bolt
+        env:
+        - name: NEO4J_AUTH
+          value: "neo4j/fortress-graph-2024"
+        - name: NEO4J_PLUGINS
+          value: '["apoc", "graph-data-science"]'
+        - name: NEO4J_dbms_memory_heap_initial__size
+          value: "2G"
+        - name: NEO4J_dbms_memory_heap_max__size
+          value: "4G"
+        - name: NEO4J_dbms_memory_pagecache_size
+          value: "2G"
+        - name: NEO4J_dbms_security_procedures_unrestricted
+          value: "apoc.*,gds.*"
+        - name: NEO4J_dbms_security_procedures_allowlist
+          value: "apoc.*,gds.*"
+        volumeMounts:
+        - name: neo4j-data
+          mountPath: /data
+        - name: neo4j-logs
+          mountPath: /logs
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "500m"
+          limits:
+            memory: "8Gi"
+            cpu: "2000m"
+        livenessProbe:
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 30
+          periodSeconds: 10
+  volumeClaimTemplates:
+  - metadata:
+      name: neo4j-data
+      labels:
+        app: neo4j
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 20Gi
+  - metadata:
+      name: neo4j-logs
+      labels:
+        app: neo4j
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  namespace: mcp-security
+  labels:
+    app: neo4j
+    component: graph-database
+spec:
+  selector:
+    app: neo4j
+  ports:
+  - port: 7474
+    name: http
+    targetPort: 7474
+  - port: 7687
+    name: bolt
+    targetPort: 7687
+  type: ClusterIP

@@ -3,7 +3,12 @@ import { apiClient } from './apiClient';
 export interface Integration {
   id: string;
   name: string;
-  type: 'siem' | 'cloud_security' | 'threat_intelligence' | 'vulnerability_management' | 'ticketing';
+  type:
+    | 'siem'
+    | 'cloud_security'
+    | 'threat_intelligence'
+    | 'vulnerability_management'
+    | 'ticketing';
   provider: string;
   status: 'connected' | 'disconnected' | 'error' | 'testing';
   enabled: boolean;
@@ -43,7 +48,12 @@ export interface Integration {
 
 export interface CreateIntegrationRequest {
   name: string;
-  type: 'siem' | 'cloud_security' | 'threat_intelligence' | 'vulnerability_management' | 'ticketing';
+  type:
+    | 'siem'
+    | 'cloud_security'
+    | 'threat_intelligence'
+    | 'vulnerability_management'
+    | 'ticketing';
   provider: string;
   config: {
     endpoint?: string;
@@ -150,7 +160,7 @@ class IntegrationsAPI {
    * Update integration
    */
   public async updateIntegration(
-    integrationId: string, 
+    integrationId: string,
     updates: Partial<Integration>
   ): Promise<Integration> {
     return apiClient.patch<Integration>(`/integrations/${integrationId}`, updates);
@@ -326,7 +336,7 @@ class IntegrationsAPI {
   public async importIntegrationConfig(configFile: File): Promise<Integration> {
     const formData = new FormData();
     formData.append('config_file', configFile);
-    
+
     const response = await apiClient.getClient().post('/integrations/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

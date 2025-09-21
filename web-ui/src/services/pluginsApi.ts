@@ -107,7 +107,10 @@ class PluginsAPI {
   /**
    * Install plugin
    */
-  public async installPlugin(pluginId: string, config?: Record<string, any>): Promise<PluginInstallationResult> {
+  public async installPlugin(
+    pluginId: string,
+    config?: Record<string, any>
+  ): Promise<PluginInstallationResult> {
     return apiClient.post<PluginInstallationResult>(`/plugins/${pluginId}/install`, { config });
   }
 
@@ -147,7 +150,7 @@ class PluginsAPI {
    * Configure installed plugin
    */
   public async configurePlugin(
-    pluginId: string, 
+    pluginId: string,
     config: Record<string, any>
   ): Promise<InstalledPlugin> {
     return apiClient.patch<InstalledPlugin>(`/plugins/installed/${pluginId}/config`, { config });
@@ -222,7 +225,10 @@ class PluginsAPI {
   /**
    * Mark review as helpful
    */
-  public async markReviewHelpful(pluginId: string, reviewId: string): Promise<{
+  public async markReviewHelpful(
+    pluginId: string,
+    reviewId: string
+  ): Promise<{
     helpful_count: number;
   }> {
     return apiClient.post<any>(`/plugins/${pluginId}/reviews/${reviewId}/helpful`);
@@ -231,13 +237,15 @@ class PluginsAPI {
   /**
    * Get plugin categories
    */
-  public async getPluginCategories(): Promise<{
-    id: string;
-    name: string;
-    description: string;
-    icon?: string;
-    plugin_count: number;
-  }[]> {
+  public async getPluginCategories(): Promise<
+    {
+      id: string;
+      name: string;
+      description: string;
+      icon?: string;
+      plugin_count: number;
+    }[]
+  > {
     return apiClient.get<any>('/plugins/categories');
   }
 
@@ -258,13 +266,15 @@ class PluginsAPI {
   /**
    * Get plugin updates available
    */
-  public async getPluginUpdates(): Promise<{
-    plugin_id: string;
-    current_version: string;
-    latest_version: string;
-    changelog: string;
-    update_available: boolean;
-  }[]> {
+  public async getPluginUpdates(): Promise<
+    {
+      plugin_id: string;
+      current_version: string;
+      latest_version: string;
+      changelog: string;
+      update_available: boolean;
+    }[]
+  > {
     return apiClient.get<any>('/plugins/updates');
   }
 

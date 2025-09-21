@@ -189,7 +189,8 @@ class AuthAPI {
    * Get user permissions
    */
   public async getUserPermissions(): Promise<string[]> {
-    const response: AxiosResponse<{ permissions: string[] }> = await this.client.get('/auth/permissions');
+    const response: AxiosResponse<{ permissions: string[] }> =
+      await this.client.get('/auth/permissions');
     return response.data.permissions;
   }
 

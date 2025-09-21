@@ -260,28 +260,32 @@ class DashboardAPI {
   /**
    * Get custom dashboard widgets configuration
    */
-  public async getDashboardWidgets(): Promise<{
-    id: string;
-    type: string;
-    title: string;
-    position: { x: number; y: number; w: number; h: number };
-    config: any;
-    enabled: boolean;
-  }[]> {
+  public async getDashboardWidgets(): Promise<
+    {
+      id: string;
+      type: string;
+      title: string;
+      position: { x: number; y: number; w: number; h: number };
+      config: any;
+      enabled: boolean;
+    }[]
+  > {
     return apiClient.get<any>('/dashboard/widgets');
   }
 
   /**
    * Update dashboard widgets configuration
    */
-  public async updateDashboardWidgets(widgets: {
-    id: string;
-    type: string;
-    title: string;
-    position: { x: number; y: number; w: number; h: number };
-    config: any;
-    enabled: boolean;
-  }[]): Promise<void> {
+  public async updateDashboardWidgets(
+    widgets: {
+      id: string;
+      type: string;
+      title: string;
+      position: { x: number; y: number; w: number; h: number };
+      config: any;
+      enabled: boolean;
+    }[]
+  ): Promise<void> {
     return apiClient.put<void>('/dashboard/widgets', { widgets });
   }
 

@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-agent
+rules:
+# Full cluster access for comprehensive security scanning
+- apiGroups: ["*"]
+  resources: ["*"]  
+  verbs: ["*"]
+# Metrics and monitoring access
+- nonResourceURLs: ["/metrics", "/logs", "/api/v1/nodes/*/proxy/stats/*"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fortress-agent
+subjects:
+- kind: ServiceAccount
+  name: fortress-agent
+  namespace: fortress-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-scanner
+  namespace: fortress-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-scanner
+rules:
+# Read access for security scanning jobs
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fortress-scanner
+subjects:
+- kind: ServiceAccount
+  name: fortress-scanner
+  namespace: fortress-system

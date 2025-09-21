@@ -1,0 +1,284 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fortress-system
+  labels:
+    name: fortress-system
+    fortress.security/agent: "true"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-agent
+rules:
+# Full cluster access for comprehensive security scanning
+- apiGroups: ["*"]
+  resources: ["*"]  
+  verbs: ["*"]
+# Metrics and monitoring access
+- nonResourceURLs: ["/metrics", "/logs", "/api/v1/nodes/*/proxy/stats/*"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fortress-agent
+subjects:
+- kind: ServiceAccount
+  name: fortress-agent
+  namespace: fortress-system
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-scanner
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+    component: scanner
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-scanner
+rules:
+# Read access for security scanning jobs
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["security.istio.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fortress-scanner
+subjects:
+- kind: ServiceAccount
+  name: fortress-scanner
+  namespace: fortress-system
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-agent-config
+  namespace: fortress-system
+data:
+  agent.yaml: |
+    agent:
+      cluster_id: "fortress-prod"
+      platform_url: "http://fortress-platform.mcp-security.svc.cluster.local:8080"
+      scan_timeout: "30m"
+      max_concurrent_scans: 5
+      result_retention: "7d"
+    
+    categories:
+      sbom_cve_scanning:
+        enabled: true
+        tools: ["syft", "grype", "trivy", "dockle", "cve-check-tool"]
+      
+      runtime_detection:
+        enabled: true
+        tools: ["falco", "tetragon", "sysdig"]
+        
+      misconfig_detection:
+        enabled: true
+        tools: ["kube-bench", "kube-hunter", "polaris", "rakkess"]
+      
+      secrets_credential:
+        enabled: true
+        tools: ["gitleaks", "trufflehog"]
+      
+      network_visibility:
+        enabled: true
+        tools: ["cilium-hubble", "netobserv", "suricata"]
+      
+      compliance_policy:
+        enabled: true
+        tools: ["openscap", "opa", "gatekeeper"]
+      
+      simulated_attacks:
+        enabled: false  # Disabled by default for security
+        tools: ["atomic-red-team", "metasploit", "pacu"]
+        require_approval: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+    component: security-orchestrator
+    fortress.security/agent: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-agent
+  template:
+    metadata:
+      labels:
+        app: fortress-agent
+        component: security-orchestrator
+    spec:
+      serviceAccountName: fortress-agent
+      containers:
+      - name: fortress-agent
+        image: ghcr.io/ggkunka/fortress-agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: FORTRESS_CLUSTER_ID
+          value: "fortress-prod"
+        - name: FORTRESS_PLATFORM_URL
+          value: "http://fortress-platform.mcp-security.svc.cluster.local:8080"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka.mcp-security.svc.cluster.local:9092"
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: fortress-config
+          mountPath: /app/config
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+          readOnly: true
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi" 
+            cpu: "1000m"
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          capabilities:
+            add: ["SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "DAC_OVERRIDE"]
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: fortress-config
+        configMap:
+          name: fortress-agent-config
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+    component: security-orchestrator
+spec:
+  selector:
+    app: fortress-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fortress-agent-netpol
+  namespace: fortress-system
+spec:
+  podSelector:
+    matchLabels:
+      app: fortress-agent
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security
+    - namespaceSelector:
+        matchLabels:
+          name: fortress-system
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - {} # Allow all outbound traffic for security tool downloads and API calls

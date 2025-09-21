@@ -99,7 +99,9 @@ class VulnerabilitiesAPI {
   /**
    * Get list of vulnerabilities with optional filters
    */
-  public async getVulnerabilities(filters?: VulnerabilityFilters): Promise<VulnerabilityListResponse> {
+  public async getVulnerabilities(
+    filters?: VulnerabilityFilters
+  ): Promise<VulnerabilityListResponse> {
     return apiClient.get<VulnerabilityListResponse>('/vulnerabilities', filters);
   }
 
@@ -114,7 +116,7 @@ class VulnerabilitiesAPI {
    * Update vulnerability
    */
   public async updateVulnerability(
-    vulnerabilityId: string, 
+    vulnerabilityId: string,
     updates: UpdateVulnerabilityRequest
   ): Promise<Vulnerability> {
     return apiClient.patch<Vulnerability>(`/vulnerabilities/${vulnerabilityId}`, updates);
@@ -124,7 +126,7 @@ class VulnerabilitiesAPI {
    * Bulk update vulnerabilities
    */
   public async bulkUpdateVulnerabilities(
-    vulnerabilityIds: string[], 
+    vulnerabilityIds: string[],
     updates: UpdateVulnerabilityRequest
   ): Promise<{ updated_count: number; vulnerabilities: Vulnerability[] }> {
     return apiClient.patch<any>('/vulnerabilities/bulk', {
@@ -185,7 +187,9 @@ class VulnerabilitiesAPI {
   /**
    * Create manual vulnerability
    */
-  public async createVulnerability(vulnerabilityData: Partial<Vulnerability>): Promise<Vulnerability> {
+  public async createVulnerability(
+    vulnerabilityData: Partial<Vulnerability>
+  ): Promise<Vulnerability> {
     return apiClient.post<Vulnerability>('/vulnerabilities', vulnerabilityData);
   }
 
@@ -214,8 +218,8 @@ class VulnerabilitiesAPI {
    * Accept vulnerability risk
    */
   public async acceptRisk(
-    vulnerabilityId: string, 
-    justification: string, 
+    vulnerabilityId: string,
+    justification: string,
     expiry_date?: string
   ): Promise<Vulnerability> {
     return apiClient.post<Vulnerability>(`/vulnerabilities/${vulnerabilityId}/accept-risk`, {

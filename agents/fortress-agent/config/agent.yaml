@@ -1,0 +1,16 @@
+agent:
+  cluster_id: "fortress-prod"
+  platform_url: "http://fortress-platform.mcp-security.svc.cluster.local:8080"
+  scan_timeout: "30m"
+  max_concurrent_scans: 5
+  
+tools:
+  trivy:
+    enabled: true
+    image: "aquasec/trivy:latest"
+  kube-bench:
+    enabled: true
+    image: "aquasec/kube-bench:latest"
+  falco:
+    enabled: true
+    image: "falcosecurity/falco-no-driver:latest"

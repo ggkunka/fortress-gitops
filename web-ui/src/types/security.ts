@@ -76,7 +76,16 @@ export interface SecurityMetrics {
 // CVE Relationship Graph Types
 export interface CVENode {
   id: string;
-  type: 'cve' | 'cluster' | 'namespace' | 'pod' | 'container' | 'process' | 'syscall' | 'file' | 'network';
+  type:
+    | 'cve'
+    | 'cluster'
+    | 'namespace'
+    | 'pod'
+    | 'container'
+    | 'process'
+    | 'syscall'
+    | 'file'
+    | 'network';
   label: string;
   severity?: 'critical' | 'high' | 'medium' | 'low';
   cvssScore?: number;
@@ -99,7 +108,7 @@ export interface CVEEdge {
   id: string;
   source: string;
   target: string;
-  type: 'affects' | 'contains' | 'runs' | 'calls' | 'accesses' | 'communicates' | 'depends';
+  type: 'affects' | 'contains' | 'runs' | 'calls' | 'accesses' | 'communicates' | 'depends' | 'spawns';
   weight?: number;
   label?: string;
   metadata?: {
@@ -206,7 +215,12 @@ export interface PatchDeployment {
 export interface SecurityEvent {
   id: string;
   timestamp: Date;
-  type: 'vulnerability_detected' | 'patch_available' | 'security_breach' | 'compliance_violation' | 'anomaly_detected';
+  type:
+    | 'vulnerability_detected'
+    | 'patch_available'
+    | 'security_breach'
+    | 'compliance_violation'
+    | 'anomaly_detected';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   title: string;
   description: string;

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: mcp-security
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  serviceName: minio
+  replicas: 4
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: object-storage
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+        args:
+        - server
+        - http://minio-{0...3}.minio.mcp-security.svc.cluster.local/data
+        - --console-address
+        - ":9001"
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          value: "fortress-admin"
+        - name: MINIO_ROOT_PASSWORD
+          value: "fortress-secure-2024"
+        - name: MINIO_PROMETHEUS_AUTH_TYPE
+          value: "public"
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-data
+      labels:
+        app: minio
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: mcp-security
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  selector:
+    app: minio
+  ports:
+  - port: 9000
+    name: api
+  - port: 9001
+    name: console
+  clusterIP: None
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: mcp-security
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  selector:
+    app: minio
+  ports:
+  - port: 9000
+    name: api
+    targetPort: 9000
+  - port: 9001
+    name: console
+    targetPort: 9001
+  type: ClusterIP
