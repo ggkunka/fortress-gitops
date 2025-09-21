@@ -23,7 +23,7 @@ spec:
       - name: ghcr-secret
       containers:
       - name: web-interface
-        image: ghcr.io/ggkunka/fortress-web-functional:v1.0.0
+        image: ghcr.io/ggkunka/fortress-web-functional:latest
         ports:
         - containerPort: 80
           name: http
