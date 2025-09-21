@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: fortress-harbor
+  name: fortress-database-security
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,12 +10,12 @@ spec:
   source:
     repoURL: https://github.com/ggkunka/mcp-security-platform.git
     targetRevision: main
-    path: infrastructure/image-registry
+    path: database/deployment
     directory:
-      include: "{harbor-deployment.yaml,harbor-istio-config.yaml}"
+      include: "database-istio-security.yaml"
   destination:
     server: https://kubernetes.default.svc
-    namespace: harbor-system
+    namespace: fortress-system
   syncPolicy:
     automated:
       prune: true
