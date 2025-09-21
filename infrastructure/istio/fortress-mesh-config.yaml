@@ -1,0 +1,186 @@
+# Fortress Security Platform - Complete Istio Service Mesh Integration
+
+# Main Fortress Gateway for all external access
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fortress-gateway
+  namespace: fortress-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http-fortress
+      protocol: HTTP
+    hosts:
+    - fortress.local
+    - "10.63.89.182"
+  - port:
+      number: 443
+      name: https-fortress
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fortress-tls
+    hosts:
+    - fortress.local
+    - "10.63.89.182"
+
+---
+# VirtualService for main Fortress platform
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fortress-platform
+  namespace: fortress-system
+spec:
+  hosts:
+  - fortress.local
+  - "10.63.89.182"
+  gateways:
+  - fortress-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/scan/
+    route:
+    - destination:
+        host: fortress-scan-orchestrator.fortress-system.svc.cluster.local
+        port:
+          number: 8002
+  - match:
+    - uri:
+        prefix: /api/database/
+    route:
+    - destination:
+        host: fortress-postgresql.fortress-system.svc.cluster.local
+        port:
+          number: 5432
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: fortress-web.fortress-system.svc.cluster.local
+        port:
+          number: 80
+
+---
+# Global mTLS Policy for Fortress namespace
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: fortress-mtls-global
+  namespace: fortress-system
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Global AuthorizationPolicy for inter-service communication
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: fortress-service-mesh-access
+  namespace: fortress-system
+spec:
+  rules:
+  - from:
+    - source:
+        namespaces: ["fortress-system", "istio-system"]
+  - to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+
+---
+# DestinationRule for Scan Orchestrator
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+spec:
+  host: fortress-scan-orchestrator.fortress-system.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 10
+        maxRequestsPerConnection: 2
+
+---
+# ServiceEntry for external registry access (Docker Hub, etc.)
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-registries
+  namespace: fortress-system
+spec:
+  hosts:
+  - registry.hub.docker.com
+  - gcr.io
+  - quay.io
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Sidecar configuration for database services (limit egress)
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: fortress-database-sidecar
+  namespace: fortress-system
+spec:
+  workloadSelector:
+    labels:
+      app: fortress-postgresql
+  egress:
+  - hosts:
+    - "./*"
+    - "istio-system/*"
+
+---
+# Network Policy for additional security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fortress-mesh-policy
+  namespace: fortress-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: fortress-system
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: fortress-system
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

@@ -16,6 +16,9 @@ spec:
     metadata:
       labels:
         app: fortress-redis
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: redis
@@ -61,6 +64,9 @@ spec:
     metadata:
       labels:
         app: fortress-postgresql
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: postgresql
@@ -132,6 +138,9 @@ spec:
     metadata:
       labels:
         app: fortress-elasticsearch
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: elasticsearch

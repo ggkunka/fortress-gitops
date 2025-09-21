@@ -1,0 +1,108 @@
+# Fortress Database Services - Istio Security Configuration
+
+# PeerAuthentication for strict mTLS on all database services
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: fortress-database-mtls
+  namespace: fortress-system
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# DestinationRule for PostgreSQL with mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-postgresql
+  namespace: fortress-system
+spec:
+  host: fortress-postgresql.fortress-system.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+# DestinationRule for Redis with mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-redis
+  namespace: fortress-system
+spec:
+  host: fortress-redis.fortress-system.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+# DestinationRule for Elasticsearch with mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-elasticsearch
+  namespace: fortress-system
+spec:
+  host: fortress-elasticsearch.fortress-system.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+# AuthorizationPolicy - Database access control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: fortress-database-access
+  namespace: fortress-system
+spec:
+  selector:
+    matchLabels:
+      app: fortress-postgresql
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/fortress-system/sa/default"]
+        namespaces: ["fortress-system"]
+  - to:
+    - operation:
+        ports: ["5432"]
+
+---
+# AuthorizationPolicy - Redis access control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: fortress-redis-access
+  namespace: fortress-system
+spec:
+  selector:
+    matchLabels:
+      app: fortress-redis
+  rules:
+  - from:
+    - source:
+        namespaces: ["fortress-system"]
+  - to:
+    - operation:
+        ports: ["6379"]
+
+---
+# AuthorizationPolicy - Elasticsearch access control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: fortress-elasticsearch-access
+  namespace: fortress-system
+spec:
+  selector:
+    matchLabels:
+      app: fortress-elasticsearch
+  rules:
+  - from:
+    - source:
+        namespaces: ["fortress-system"]
+  - to:
+    - operation:
+        ports: ["9200", "9300"]
