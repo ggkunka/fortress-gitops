@@ -11,6 +11,8 @@ spec:
     repoURL: https://github.com/ggkunka/mcp-security-platform.git
     targetRevision: main
     path: infrastructure/image-registry
+    directory:
+      include: "harbor-deployment.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: harbor-system

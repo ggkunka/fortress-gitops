@@ -1,3 +1,5 @@
+# Harbor Registry for Air-Gapped Image Mirroring - Complete Architecture
+
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -59,12 +61,33 @@ spec:
           value: "fortress-harbor-secret"
         - name: JOBSERVICE_SECRET
           value: "fortress-jobservice-secret"
+        - name: DATABASE_TYPE
+          value: "postgresql"
+        - name: POSTGRESQL_HOST
+          value: "localhost"
+        - name: POSTGRESQL_PORT
+          value: "5432"
+        - name: POSTGRESQL_USERNAME
+          value: "postgres"
+        - name: POSTGRESQL_PASSWORD
+          value: "fortress123"
+        - name: POSTGRESQL_DATABASE
+          value: "registry"
+        - name: REGISTRY_URL
+          value: "http://localhost:5000"
         volumeMounts:
         - name: harbor-config
           mountPath: /etc/core/app.conf
           subPath: app.conf
         - name: registry-data
           mountPath: /storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
       - name: harbor-registry
         image: goharbor/registry-photon:v2.9.0
         ports:
@@ -72,12 +95,21 @@ spec:
         env:
         - name: REGISTRY_HTTP_SECRET
           value: "fortress-registry-secret"
+        - name: REGISTRY_LOG_LEVEL
+          value: "info"
         volumeMounts:
         - name: registry-data
           mountPath: /storage
         - name: registry-config
           mountPath: /etc/registry/config.yml
           subPath: config.yml
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
       - name: harbor-db
         image: goharbor/harbor-db:v2.9.0
         ports:
@@ -89,9 +121,18 @@ spec:
           value: "postgres"
         - name: POSTGRES_DB
           value: "registry"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
         volumeMounts:
         - name: database-data
           mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
       volumes:
       - name: registry-data
         persistentVolumeClaim:
