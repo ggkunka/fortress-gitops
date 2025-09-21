@@ -1,0 +1,53 @@
+# Fortress Web Interface with Istio
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-web
+  namespace: fortress-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-web
+  template:
+    metadata:
+      labels:
+        app: fortress-web
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: web-interface
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: web-content
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: web-content
+        configMap:
+          name: fortress-web-content
+      - name: nginx-config
+        configMap:
+          name: fortress-web-nginx
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-web
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-web
+  ports:
+  - port: 80
+    targetPort: 80
+  type: NodePort
+  nodePort: 30080
