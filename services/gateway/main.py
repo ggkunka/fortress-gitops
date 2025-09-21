@@ -228,6 +228,64 @@ async def get_vulnerabilities():
         }
     ]
 
+@app.get("/threats/detection")
+async def get_threat_detection():
+    """Get threat detection data."""
+    return {
+        "activeThreats": 5,
+        "detectionRate": 97.3,
+        "lastScan": "2024-09-21T00:00:00Z",
+        "threats": [
+            {
+                "id": "threat-001",
+                "type": "Malware",
+                "severity": "High", 
+                "source": "container-runtime",
+                "timestamp": "2024-09-21T00:00:00Z",
+                "status": "active"
+            }
+        ]
+    }
+
+@app.get("/clusters/{cluster_id}/pods")
+async def get_cluster_pods(cluster_id: str):
+    """Get pods for a specific cluster."""
+    return [
+        {
+            "name": f"auth-service-5875f8b854-75kjt",
+            "namespace": "mcp-security",
+            "status": "Running",
+            "ready": "1/1",
+            "restarts": 0,
+            "age": "28h",
+            "node": "fortress",
+            "image": "mcp-security/auth-service:latest",
+            "clusterId": cluster_id
+        },
+        {
+            "name": f"gateway-service-678c7549c7-xs97v",
+            "namespace": "mcp-security", 
+            "status": "Running",
+            "ready": "1/1",
+            "restarts": 0,
+            "age": "7h",
+            "node": "fortress",
+            "image": "ghcr.io/ggkunka/mcp-gateway-service:latest",
+            "clusterId": cluster_id
+        }
+    ]
+
+@app.post("/scan/cluster/{cluster_id}")
+async def scan_cluster(cluster_id: str):
+    """Start a cluster scan."""
+    return {
+        "scanId": f"scan-{cluster_id}-001",
+        "status": "started",
+        "clusterId": cluster_id,
+        "timestamp": "2024-09-21T00:00:00Z",
+        "message": f"Security scan started for cluster {cluster_id}"
+    }
+
 
 # Error handlers
 @app.exception_handler(404)
