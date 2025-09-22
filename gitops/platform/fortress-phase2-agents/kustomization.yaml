@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: fortress-phase2-agents
+  annotations:
+    fortress.io/phase: "2"
+    fortress.io/description: "Distributed Security Agents - eBPF, nmap, Nessus, Anchore, DAST, Compliance"
+
+resources:
+  - fortress-security-agents-daemonset.yaml
+  - fortress-agent-rbac.yaml
+  - fortress-scan-orchestrator.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: fortress-platform
+  app.kubernetes.io/version: v1.0.0
+  fortress.io/component: security-agents
+  
+commonAnnotations:
+  sidecar.istio.io/inject: "true"
+  fortress.io/managed: "true"
