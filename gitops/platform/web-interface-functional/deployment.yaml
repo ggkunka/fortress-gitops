@@ -23,7 +23,7 @@ spec:
       - name: ghcr-secret
       containers:
       - name: web-interface
-        image: ghcr.io/ggkunka/fortress-react:latest
+        image: ghcr.io/ggkunka/fortress-react-fixed:latest
         ports:
         - containerPort: 80
           name: http
