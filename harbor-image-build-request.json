@@ -1,0 +1,64 @@
+{
+  "images_to_build": [
+    {
+      "name": "fortress-graphql-gateway",
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "starlette-graphene3", "graphene", "asyncpg", "redis"],
+      "source_code": "services/advanced-apis/graphql-gateway/",
+      "port": 8087
+    },
+    {
+      "name": "fortress-websocket-gateway", 
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "websockets", "socketio", "redis"],
+      "source_code": "services/advanced-apis/websocket-gateway/",
+      "port": 8088
+    },
+    {
+      "name": "fortress-oauth-service",
+      "tag": "v1.0.0", 
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "python-jose[cryptography]", "passlib[bcrypt]", "python-multipart"],
+      "source_code": "services/security/oauth-service/",
+      "port": 8090
+    },
+    {
+      "name": "fortress-zero-trust-service",
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim", 
+      "packages": ["fastapi", "uvicorn", "pydantic", "cryptography"],
+      "source_code": "services/security/zero-trust-service/",
+      "port": 8091
+    },
+    {
+      "name": "fortress-threat-intel-service",
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "aiohttp", "pydantic"], 
+      "source_code": "services/integrations/threat-intel-service/",
+      "port": 8092
+    },
+    {
+      "name": "fortress-cloud-integration",
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "boto3", "azure-identity", "azure-mgmt-security", "google-cloud-securitycenter"],
+      "source_code": "services/integrations/cloud-integrations/", 
+      "port": 8093
+    },
+    {
+      "name": "fortress-devops-integration",
+      "tag": "v1.0.0",
+      "base_image": "python:3.11-slim",
+      "packages": ["fastapi", "uvicorn", "requests", "pydantic"],
+      "source_code": "services/integrations/devops-integrations/",
+      "port": 8094
+    }
+  ],
+  "registry_config": {
+    "push_to": "harbor-registry.default.svc.cluster.local:5000/fortress",
+    "proxy": "http://10.158.100.6:8080"
+  }
+}

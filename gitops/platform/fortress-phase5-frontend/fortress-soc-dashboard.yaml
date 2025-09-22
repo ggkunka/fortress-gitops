@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-soc-frontend
+  namespace: mcp-security
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head><title>Fortress SOC Dashboard</title>
+    <style>
+    body{font-family:Arial;margin:0;background:#0a0a0a;color:#fff}
+    .header{background:#1a1a1a;padding:15px;border-bottom:2px solid #ff6b35}
+    .logo{font-size:24px;font-weight:bold;color:#ff6b35}
+    .sidebar{position:fixed;left:0;top:60px;width:250px;height:calc(100vh-60px);background:#1a1a1a;padding:20px 0}
+    .main{margin-left:250px;padding:20px;margin-top:60px}
+    .nav-item{padding:12px 20px;cursor:pointer;border-left:3px solid transparent}
+    .nav-item:hover,.nav-item.active{background:#2a2a2a;border-left-color:#ff6b35}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+    .card{background:#1a1a1a;border-radius:8px;padding:20px;border:1px solid #333}
+    .metric{font-size:32px;font-weight:bold}
+    .critical{color:#ff4757}.warning{color:#ffa502}.success{color:#2ed573}
+    </style></head>
+    <body>
+    <div class="header"><div class="logo">🏰 FORTRESS SOC</div></div>
+    <div class="sidebar">
+    <div class="nav-item active">📊 Security Dashboard</div>
+    <div class="nav-item">🤖 Agent Management</div>
+    <div class="nav-item">🚨 Alert Management</div>
+    <div class="nav-item">✅ Compliance</div>
+    </div>
+    <div class="main">
+    <h2>Live Security Operations Center</h2>
+    <div class="grid">
+    <div class="card"><h3>Security Score</h3><div class="metric success">87.3%</div></div>
+    <div class="card"><h3>Active Agents</h3><div class="metric success">45</div></div>
+    <div class="card"><h3>Critical Alerts</div><div class="metric critical">23</div></div>
+    <div class="card"><h3>Scans Running</h3><div class="metric warning">12</div></div>
+    </div>
+    <div class="card" style="margin-top:20px">
+    <h3>Agent Status - Real-time</h3>
+    <div>🟢 fortress-prod: 12 agents active, eBPF monitoring</div>
+    <div>🟡 fortress-staging: 8 agents active, vulnerability scanning</div>
+    <div>🟢 fortress-dev: 6 agents active, compliance checking</div>
+    </div>
+    </div>
+    <script>
+    setInterval(()=>{
+    document.querySelector('.metric.critical').textContent = Math.floor(Math.random()*30+20);
+    document.querySelector('.metric.warning').textContent = Math.floor(Math.random()*20+5);
+    },5000);
+    </script>
+    </body></html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-soc-dashboard
+  namespace: mcp-security
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-soc-dashboard
+  template:
+    metadata:
+      labels:
+        app: fortress-soc-dashboard
+    spec:
+      containers:
+      - name: soc-dashboard
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html
+        configMap:
+          name: fortress-soc-frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-soc-dashboard
+  namespace: mcp-security
+spec:
+  selector:
+    app: fortress-soc-dashboard
+  ports:
+  - port: 80

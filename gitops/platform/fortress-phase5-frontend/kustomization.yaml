@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: fortress-phase5-frontend
+  annotations:
+    fortress.io/phase: "5"
+    fortress.io/description: "Orca-style frontend with agent management console and live security dashboard"
+
+resources:
+  - fortress-soc-dashboard.yaml
+  - fortress-agent-management-console.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: fortress-platform
+  app.kubernetes.io/version: v1.0.0
+  fortress.io/component: frontend-soc
+  
+commonAnnotations:
+  sidecar.istio.io/inject: "true"
+  fortress.io/managed: "true"

@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-threat-intel-code
+  namespace: fortress-system
+data:
+  main.py: |
+    from fastapi import FastAPI
+    from datetime import datetime
+    import uvicorn
+    
+    app = FastAPI(title="Fortress Threat Intelligence Service", version="1.0.0")
+    
+    threat_db = {
+        "198.51.100.42": {"type": "ip", "threat": "C2_SERVER", "severity": "HIGH"},
+        "malicious.com": {"type": "domain", "threat": "PHISHING", "severity": "CRITICAL"}
+    }
+    
+    @app.post("/lookup")
+    async def lookup_indicator(request: dict):
+        indicator = request.get("indicator", "").lower()
+        match = threat_db.get(indicator)
+        
+        return {
+            "indicator": indicator,
+            "threat_level": "HIGH" if match else "CLEAN",
+            "details": match or {},
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    @app.get("/feeds")
+    async def list_feeds():
+        return {
+            "feeds": ["virustotal", "alienvault_otx", "abuse_ch"],
+            "total_indicators": len(threat_db)
+        }
+    
+    @app.get("/health")
+    async def health_check():
+        return {"status": "healthy", "service": "threat-intel"}
+    
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=8092)

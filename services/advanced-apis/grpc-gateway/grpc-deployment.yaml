@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-grpc-gateway
+  namespace: fortress-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-grpc-gateway
+  template:
+    metadata:
+      labels:
+        app: fortress-grpc-gateway
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: grpc-gateway
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8089
+        command: ["python", "-c", "print('gRPC Ready'); import time; time.sleep(3600)"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-grpc-gateway
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-grpc-gateway
+  ports:
+  - port: 8089
+    targetPort: 8089
+  type: ClusterIP

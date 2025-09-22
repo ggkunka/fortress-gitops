@@ -23,7 +23,7 @@ spec:
       - name: ghcr-secret
       containers:
       - name: web-interface
-        image: ghcr.io/ggkunka/fortress-orca-gui:latest
+        image: ghcr.io/ggkunka/fortress-orca-v2:latest
         ports:
         - containerPort: 80
           name: http

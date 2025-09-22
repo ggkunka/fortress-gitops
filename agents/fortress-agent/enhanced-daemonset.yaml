@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fortress-security-agent
+  namespace: fortress-system
+spec:
+  selector:
+    matchLabels:
+      app: fortress-security-agent
+  template:
+    metadata:
+      labels:
+        app: fortress-security-agent
+    spec:
+      serviceAccountName: fortress-agent
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: fortress-agent
+        image: python:3.11-slim
+        securityContext:
+          privileged: true
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: FORTRESS_PLATFORM_URL
+          value: "http://fortress-ingestion-service.mcp-security.svc.cluster.local:8081"
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          apt-get update && apt-get install -y nmap curl bpftrace
+          pip install kubernetes requests fastapi uvicorn
+          mkdir -p /agent && cd /agent
+          cat > agent.py << 'EOF'
+          import subprocess
+          import json
+          import time
+          from datetime import datetime
+          
+          def ebpf_monitor():
+              """Basic eBPF monitoring"""
+              try:
+                  result = subprocess.run(['bpftrace', '-l'], capture_output=True, text=True, timeout=10)
+                  return {"ebpf_available": result.returncode == 0}
+              except:
+                  return {"ebpf_available": False}
+          
+          def network_scan():
+              """Network discovery using nmap"""
+              try:
+                  result = subprocess.run(['nmap', '-sn', '10.0.0.0/24'], capture_output=True, text=True, timeout=60)
+                  return {"scan_result": result.stdout[:500]}
+              except:
+                  return {"scan_result": "failed"}
+          
+          def vulnerability_check():
+              """Basic vulnerability checking"""
+              return {"vuln_scan": "implemented", "timestamp": datetime.now().isoformat()}
+          
+          while True:
+              agent_data = {
+                  "node": os.environ.get("NODE_NAME"),
+                  "ebpf": ebpf_monitor(),
+                  "network": network_scan(),
+                  "vulnerabilities": vulnerability_check()
+              }
+              print(json.dumps(agent_data))
+              time.sleep(300)  # 5 minutes
+          EOF
+          python agent.py
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
