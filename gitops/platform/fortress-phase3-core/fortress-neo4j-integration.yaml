@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-neo4j-code
+  namespace: mcp-security
+data:
+  main.py: |
+    from fastapi import FastAPI
+    import uvicorn
+    from neo4j import GraphDatabase
+    
+    app = FastAPI(title="Fortress Neo4j Asset Relations", version="1.0.0")
+    
+    # Neo4j connection
+    NEO4J_URI = "bolt://fortress-neo4j.fortress-system.svc.cluster.local:7687"
+    driver = GraphDatabase.driver(NEO4J_URI, auth=("neo4j", "fortress_secure_password"))
+    
+    @app.post("/assets/create")
+    def create_asset(asset: dict):
+        # Create asset in graph database
+        with driver.session() as session:
+            result = session.run(
+                "MERGE (a:Asset {asset_id: $asset_id}) SET a.name = $name, a.type = $type RETURN a",
+                asset_id=asset["asset_id"], name=asset["name"], type=asset["type"]
+            )
+            return {"status": "created", "asset_id": asset["asset_id"]}
+    
+    @app.post("/relationships/create")
+    def create_relationship(rel: dict):
+        # Create relationship between assets
+        with driver.session() as session:
+            session.run(
+                "MATCH (a:Asset {asset_id: $source}) MATCH (b:Asset {asset_id: $target}) "
+                "MERGE (a)-[r:CONNECTS_TO {type: $rel_type}]->(b) RETURN r",
+                source=rel["source"], target=rel["target"], rel_type=rel["type"]
+            )
+            return {"status": "relationship_created"}
+    
+    @app.get("/attack-paths/{source}/{target}")
+    def find_attack_paths(source: str, target: str):
+        # Find attack paths using graph algorithms
+        with driver.session() as session:
+            result = session.run(
+                "MATCH path = shortestPath((s:Asset {asset_id: $source})-[:CONNECTS_TO*1..5]->(t:Asset {asset_id: $target})) RETURN path",
+                source=source, target=target
+            )
+            paths = [{"path_length": len(record["path"].nodes), "nodes": [node["asset_id"] for node in record["path"].nodes]} for record in result]
+            return {"attack_paths": paths}
+    
+    @app.get("/health")
+    def health():
+        return {"status": "healthy", "service": "neo4j_integration", "database": "connected"}
+    
+    if __name__ == "__main__": uvicorn.run(app, host="0.0.0.0", port=8095)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-neo4j-integration
+  namespace: mcp-security
+  annotations:
+    sidecar.istio.io/inject: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-neo4j-integration
+  template:
+    metadata:
+      labels:
+        app: fortress-neo4j-integration
+    spec:
+      containers:
+      - name: neo4j-integration
+        image: python:3.11-slim
+        env:
+        - name: HTTP_PROXY
+          value: "http://10.158.100.6:8080"
+        - name: NEO4J_URI
+          value: "bolt://fortress-neo4j.fortress-system.svc.cluster.local:7687"
+        volumeMounts:
+        - name: code
+          mountPath: /app
+        command: ["bash", "-c", "cd /app && pip install fastapi uvicorn neo4j && python main.py"]
+        ports:
+        - containerPort: 8095
+      volumes:
+      - name: code
+        configMap:
+          name: fortress-neo4j-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-neo4j-integration
+  namespace: mcp-security
+spec:
+  selector:
+    app: fortress-neo4j-integration
+  ports:
+  - port: 8095

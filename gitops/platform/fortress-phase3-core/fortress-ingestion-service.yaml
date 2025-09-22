@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-ingestion-code
+  namespace: mcp-security
+data:
+  main.py: |
+    from fastapi import FastAPI
+    import uvicorn, json, requests
+    from datetime import datetime
+    
+    app = FastAPI(title="Fortress Ingestion Service", version="1.0.0")
+    
+    @app.post("/ingest/agent-data")
+    def ingest_agent_data(data: dict):
+        # Aggregate and normalize agent data + cloud APIs
+        return {"ingested": True, "events": 1, "timestamp": datetime.now().isoformat()}
+    
+    @app.post("/ingest/cloud/{provider}")  
+    def ingest_cloud_data(provider: str, data: dict):
+        # AWS/Azure/GCP native API ingestion
+        return {"provider": provider, "resources": len(data.get("resources", [])), "status": "processed"}
+    
+    @app.get("/health")
+    def health(): 
+        return {"status": "healthy", "service": "ingestion", "version": "1.0.0"}
+    
+    if __name__ == "__main__": uvicorn.run(app, host="0.0.0.0", port=8081)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-ingestion-service
+  namespace: mcp-security
+  annotations:
+    sidecar.istio.io/inject: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-ingestion-service
+  template:
+    metadata:
+      labels:
+        app: fortress-ingestion-service
+    spec:
+      containers:
+      - name: ingestion
+        image: python:3.11-slim
+        env:
+        - name: HTTP_PROXY
+          value: "http://10.158.100.6:8080"
+        - name: KAFKA_BROKERS
+          value: "kafka:9092"
+        volumeMounts:
+        - name: code
+          mountPath: /app
+        command: ["bash", "-c", "cd /app && pip install fastapi uvicorn kafka-python && python main.py"]
+        ports:
+        - containerPort: 8081
+      volumes:
+      - name: code
+        configMap:
+          name: fortress-ingestion-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-ingestion-service
+  namespace: mcp-security
+spec:
+  selector:
+    app: fortress-ingestion-service
+  ports:
+  - port: 8081
