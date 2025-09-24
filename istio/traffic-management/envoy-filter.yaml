@@ -1,0 +1,236 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: mcp-security-rate-limit
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: envoy-filter
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          value:
+            stat_prefix: local_rate_limiter
+            token_bucket:
+              max_tokens: 100
+              tokens_per_fill: 100
+              fill_interval: 60s
+            filter_enabled:
+              runtime_key: local_rate_limit_enabled
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: local_rate_limit_enforced
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            response_headers_to_add:
+            - append: false
+              header:
+                key: x-local-rate-limit
+                value: 'true'
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: mcp-security-waf
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: waf-filter
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.wasm
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+          config:
+            name: "security_filter"
+            root_id: "security_filter"
+            configuration:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: |
+                {
+                  "blocked_user_agents": [
+                    "sqlmap",
+                    "nikto",
+                    "w3af",
+                    "acunetix",
+                    "nessus",
+                    "openvas",
+                    "burp",
+                    "zap"
+                  ],
+                  "blocked_paths": [
+                    "/.env",
+                    "/admin",
+                    "/wp-admin",
+                    "/phpmyadmin",
+                    "/.git",
+                    "/config"
+                  ],
+                  "sql_injection_patterns": [
+                    "union.*select",
+                    "drop.*table",
+                    "insert.*into",
+                    "delete.*from",
+                    "update.*set",
+                    "exec.*xp_"
+                  ],
+                  "xss_patterns": [
+                    "<script",
+                    "javascript:",
+                    "onload=",
+                    "onerror=",
+                    "eval\(",
+                    "alert\("
+                  ]
+                }
+            vm_config:
+              vm_id: "security_filter"
+              runtime: "envoy.wasm.runtime.v8"
+              code:
+                local:
+                  inline_string: |
+                    class SecurityFilter {
+                      constructor(rootContext) {
+                        this.rootContext = rootContext;
+                      }
+                      
+                      onRequestHeaders() {
+                        const userAgent = this.getRequestHeader("user-agent");
+                        const path = this.getRequestHeader(":path");
+                        
+                        // Check blocked user agents
+                        if (this.isBlockedUserAgent(userAgent)) {
+                          this.sendLocalResponse(403, "Forbidden", "Security policy violation", []);
+                          return FilterHeadersStatus.StopIteration;
+                        }
+                        
+                        // Check blocked paths
+                        if (this.isBlockedPath(path)) {
+                          this.sendLocalResponse(404, "Not Found", "Resource not found", []);
+                          return FilterHeadersStatus.StopIteration;
+                        }
+                        
+                        return FilterHeadersStatus.Continue;
+                      }
+                      
+                      onRequestBody(bodySize, endOfStream) {
+                        if (bodySize > 0) {
+                          const body = this.getRequestBodyBuffer();
+                          if (this.containsMaliciousContent(body)) {
+                            this.sendLocalResponse(400, "Bad Request", "Invalid request content", []);
+                            return FilterDataStatus.StopIterationNoBuffer;
+                          }
+                        }
+                        return FilterDataStatus.Continue;
+                      }
+                    }
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: mcp-security-headers
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: security-headers
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_response(response_handle)
+              -- Security headers
+              response_handle:headers():add("X-Content-Type-Options", "nosniff")
+              response_handle:headers():add("X-Frame-Options", "DENY")
+              response_handle:headers():add("X-XSS-Protection", "1; mode=block")
+              response_handle:headers():add("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+              response_handle:headers():add("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:")
+              response_handle:headers():add("Referrer-Policy", "strict-origin-when-cross-origin")
+              response_handle:headers():add("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+              
+              -- Remove server information
+              response_handle:headers():remove("Server")
+              response_handle:headers():remove("X-Powered-By")
+              
+              -- Add custom security headers
+              response_handle:headers():add("X-Security-Platform", "MCP-Security")
+              response_handle:headers():add("X-Request-ID", response_handle:headers():get(":request-id") or "unknown")
+            end
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: mcp-security-cors
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: cors-filter
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.cors
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+  - applyTo: HTTP_ROUTE
+    match:
+      context: SIDECAR_INBOUND
+    patch:
+      operation: MERGE
+      value:
+        route:
+          cors:
+            allow_origin_string_match:
+            - prefix: "https://security.company.com"
+            - prefix: "https://api.security.company.com"
+            - exact: "https://localhost:3000"  # Development
+            allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            allow_headers: "Content-Type, Authorization, X-Requested-With, X-Organization-ID, X-User-ID, X-API-Key"
+            expose_headers: "X-Request-ID, X-Rate-Limit-Remaining, X-Rate-Limit-Reset"
+            max_age: "86400"
+            allow_credentials: true

@@ -1,0 +1,154 @@
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-auth-provider
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: service-entry
+spec:
+  hosts:
+  - auth.company.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  - number: 80
+    name: http
+    protocol: HTTP
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-vulnerability-feeds
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: vuln-feeds-service-entry
+spec:
+  hosts:
+  - nvd.nist.gov
+  - cve.mitre.org
+  - vuldb.com
+  - cve.circl.lu
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-threat-intel
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: threat-intel-service-entry
+spec:
+  hosts:
+  - api.threatintelligence.com
+  - feeds.alienvault.com
+  - reputation.alienvault.com
+  - ioc.hail-a-taxii.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-notification-services
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: notification-service-entry
+spec:
+  hosts:
+  - api.sendgrid.com
+  - hooks.slack.com
+  - api.pagerduty.com
+  - api.twilio.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-cloud-providers
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: cloud-providers-service-entry
+spec:
+  hosts:
+  - sts.amazonaws.com
+  - ec2.amazonaws.com
+  - s3.amazonaws.com
+  - management.azure.com
+  - storage.googleapis.com
+  - compute.googleapis.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-siem-platforms
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: siem-platforms-service-entry
+spec:
+  hosts:
+  - splunk.company.com
+  - elastic.company.com
+  - loganalytics.azure.com
+  - logs.google.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  - number: 8089
+    name: splunk-api
+    protocol: HTTPS
+  - number: 9200
+    name: elasticsearch
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-container-registries
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: registry-service-entry
+spec:
+  hosts:
+  - registry.hub.docker.com
+  - gcr.io
+  - quay.io
+  - registry.company.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS

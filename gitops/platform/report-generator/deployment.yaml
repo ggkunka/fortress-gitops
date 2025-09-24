@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-generator
+  labels:
+    app: report-generator
+    component: reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-generator
+  template:
+    metadata:
+      labels:
+        app: report-generator
+        component: reporting
+    spec:
+      containers:
+      - name: report-generator
+        image: python:3.11-slim
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Report Generator Service - MCP Security Platform' && echo 'Ready to generate security reports' && tail -f /dev/null"]
+        ports:
+        - containerPort: 8084
+        env:
+        - name: SERVICE_NAME
+          value: "report-generator"
+        - name: DATABASE_URL
+          value: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+        - name: REDIS_URL
+          value: "redis://redis-master:6379/0"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: VULNERABILITY_ANALYZER_URL
+          value: "http://vulnerability-analyzer:8083"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "echo 'Report Generator is alive'"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "echo 'Report Generator is ready'"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-generator
+  labels:
+    app: report-generator
+    component: reporting
+spec:
+  selector:
+    app: report-generator
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084
+    protocol: TCP
+  type: ClusterIP

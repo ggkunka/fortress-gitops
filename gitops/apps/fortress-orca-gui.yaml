@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fortress-orca-gui
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: fortress-orca-gui
+    fortress.io/component: orca-style-interface
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/fortress-orca-gui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+  revisionHistoryLimit: 10

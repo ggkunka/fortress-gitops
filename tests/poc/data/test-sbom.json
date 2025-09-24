@@ -1,0 +1,175 @@
+{
+  "bom_format": "CycloneDX",
+  "spec_version": "1.5",
+  "serial_number": "urn:uuid:test-poc-sbom-12345",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "tools": [
+      {
+        "vendor": "MCP Security",
+        "name": "Test SBOM Generator",
+        "version": "1.0.0"
+      }
+    ],
+    "authors": [
+      {
+        "name": "Test Suite",
+        "email": "test@mcp-security.local"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "pkg:npm/express@4.17.1",
+      "type": "library",
+      "name": "express",
+      "version": "4.17.1",
+      "purl": "pkg:npm/express@4.17.1",
+      "licenses": ["MIT"],
+      "description": "Fast, unopinionated, minimalist web framework for Node.js",
+      "supplier": "TJ Holowaychuk",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c9b5bf14e5b8e3b0b2d8b6f17c8b0a1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7"
+        }
+      ]
+    },
+    {
+      "id": "pkg:npm/lodash@4.17.15", 
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.15",
+      "purl": "pkg:npm/lodash@4.17.15",
+      "licenses": ["MIT"],
+      "description": "A modern JavaScript utility library delivering modularity, performance, & extras",
+      "supplier": "John-David Dalton"
+    },
+    {
+      "id": "pkg:npm/axios@0.21.0",
+      "type": "library",
+      "name": "axios",
+      "version": "0.21.0", 
+      "purl": "pkg:npm/axios@0.21.0",
+      "licenses": ["MIT"],
+      "description": "Promise based HTTP client for the browser and node.js",
+      "supplier": "Matt Zabriskie"
+    },
+    {
+      "id": "pkg:docker/nginx@1.20.1",
+      "type": "container",
+      "name": "nginx",
+      "version": "1.20.1",
+      "purl": "pkg:docker/nginx@1.20.1",
+      "description": "HTTP and reverse proxy server, a mail proxy server",
+      "supplier": "Igor Sysoev"
+    },
+    {
+      "id": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "type": "library",
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "namespace": "org.apache.logging.log4j",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "licenses": ["Apache-2.0"],
+      "description": "The Apache Log4j Implementation",
+      "supplier": "Apache Software Foundation"
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "id": "CVE-2021-44228",
+      "source": "NVD",
+      "ratings": [
+        {
+          "score": 10.0,
+          "severity": "critical",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+        }
+      ],
+      "cwes": [502, 917, 20],
+      "description": "Apache Log4j2 2.0-beta9 through 2.15.0 JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.",
+      "detail": "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases 2.12.2, 2.12.3, and 2.3.1) JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints. An attacker who can control log messages or log message parameters can execute arbitrary code loaded from LDAP servers when message lookup substitution is enabled.",
+      "recommendation": "Upgrade to Log4j 2.17.0 or later. For versions 2.10 and later, set system property log4j2.formatMsgNoLookups to true or remove JndiLookup class from classpath.",
+      "affects": ["pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"],
+      "published": "2021-12-10T10:00:00Z",
+      "updated": "2021-12-14T14:00:00Z"
+    },
+    {
+      "id": "CVE-2021-23337",
+      "source": "NVD",
+      "ratings": [
+        {
+          "score": 7.2,
+          "severity": "high", 
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "cwes": [1321],
+      "description": "Lodash versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+      "detail": "Lodash versions prior to 4.17.21 are vulnerable to Command Injection via the template function. The lodash template function can be used to create a compiled template function that can execute arbitrary code.",
+      "recommendation": "Upgrade to lodash 4.17.21 or later",
+      "affects": ["pkg:npm/lodash@4.17.15"],
+      "published": "2021-02-15T14:00:00Z"
+    },
+    {
+      "id": "CVE-2021-3807", 
+      "source": "NVD",
+      "ratings": [
+        {
+          "score": 9.1,
+          "severity": "critical",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+        }
+      ],
+      "cwes": [835],
+      "description": "ansi-regex is vulnerable to Regular Expression Denial of Service (ReDoS) due to improper input validation of user-provided regular expressions.",
+      "detail": "ansi-regex is vulnerable to Regular Expression Denial of Service (ReDoS) due to improper input validation. An attacker could abuse this vulnerability to cause the application to consume excessive CPU and memory resources.",
+      "recommendation": "Upgrade to axios 0.21.2 or later which includes updated ansi-regex dependency",
+      "affects": ["pkg:npm/axios@0.21.0"],
+      "published": "2021-09-17T07:00:00Z"
+    },
+    {
+      "id": "CVE-2021-23017",
+      "source": "NVD",
+      "ratings": [
+        {
+          "score": 7.7,
+          "severity": "high",
+          "method": "CVSSv3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:N/I:N/A:H"
+        }
+      ],
+      "cwes": [787],
+      "description": "A security issue in nginx resolver was identified, which might allow an attacker who is able to forge UDP packets from the DNS server to cause 1-byte memory overwrite.",
+      "detail": "A security issue in nginx resolver was identified, which might allow an attacker who is able to forge UDP packets from the DNS server to cause 1-byte memory overwrite, resulting in worker process crash or potential other impact.",
+      "recommendation": "Upgrade to nginx 1.20.2, 1.21.5 or later",
+      "affects": ["pkg:docker/nginx@1.20.1"],
+      "published": "2021-06-01T15:00:00Z"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:npm/express@4.17.1",
+      "dependsOn": ["pkg:npm/lodash@4.17.15"]
+    },
+    {
+      "ref": "pkg:npm/axios@0.21.0", 
+      "dependsOn": []
+    }
+  ],
+  "properties": [
+    {
+      "name": "test:environment",
+      "value": "poc"
+    },
+    {
+      "name": "test:generated_by",
+      "value": "mcp-test-suite"
+    }
+  ]
+}

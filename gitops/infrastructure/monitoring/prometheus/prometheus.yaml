@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-mcp-rules
+  namespace: mcp-security-monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-rules
+    app.kubernetes.io/component: monitoring
+data:
+  mcp-security-platform.yml: |
+    groups:
+    - name: mcp-security-platform
+      rules:
+      # High error rate alerts
+      - alert: HighErrorRate
+        expr: rate(istio_requests_total{response_code!~"2.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.destination_service_name }}"
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} for service {{ $labels.destination_service_name }}"
+      
+      # Authentication failures
+      - alert: AuthenticationFailures
+        expr: rate(istio_requests_total{response_code="401"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.destination_service_name }}"
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }} for service {{ $labels.destination_service_name }}"
+      
+      # Service down alerts
+      - alert: ServiceDown
+        expr: up{job=~"mcp-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute"
+      
+      # High latency alerts
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(istio_request_duration_milliseconds_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.destination_service_name }}"
+        annotations:
+          summary: "High latency detected"
+          description: "95th percentile latency is {{ $value }}ms for service {{ $labels.destination_service_name }}"
+      
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: increase(postgresql_up{job="postgresql"}[5m]) == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "postgresql"
+        annotations:
+          summary: "Database connection issues"
+          description: "PostgreSQL database is not responding"
+      
+      # Vulnerability scanning alerts
+      - alert: ScanFailureRate
+        expr: rate(mcp_scans_failed_total[5m]) / rate(mcp_scans_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: "scanner"
+        annotations:
+          summary: "High scan failure rate"
+          description: "Scan failure rate is {{ $value }} - check scanner health"
+      
+      # Critical vulnerability detection
+      - alert: CriticalVulnerabilityDetected
+        expr: increase(mcp_vulnerabilities_total{severity="critical"}[1h]) > 5
+        labels:
+          severity: critical
+          component: "vulnerability-analyzer"
+        annotations:
+          summary: "Multiple critical vulnerabilities detected"
+          description: "{{ $value }} critical vulnerabilities detected in the last hour"

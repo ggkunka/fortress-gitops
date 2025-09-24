@@ -1,0 +1,539 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: auth-service
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: authentication
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/auth-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Authentication Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-service
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gateway-service
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: api-gateway
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/gateway-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "API Gateway Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: scanner-manager
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: scanner-manager
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: security-scanning
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/scanner-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Scanner Manager Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vulnerability-analyzer
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: vulnerability-analyzer
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: security-analysis
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/vulnerability-analyzer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Vulnerability Analyzer Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: report-generator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: report-generator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: reporting
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/report-generator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Report Generator Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notification-service
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: notifications
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/notification-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Notification Service for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: web-interface
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: web-interface
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: frontend
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/web-interface
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Web Interface for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-ingress
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: networking
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/ingress
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Ingress and external access for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: plugin-manager
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: plugin-manager
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: plugin-system
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/plugin-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Plugin Manager for extensible security modules"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: graphql-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: api-gateway
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/graphql-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "GraphQL API gateway for unified data access"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: websocket-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: websocket-gateway
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: realtime-communication
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/websocket-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "WebSocket gateway for real-time communication"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cicd-integration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cicd-integration
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: external-integration
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/cicd-integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "CI/CD pipeline security integration"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: siem-integration
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: siem-integration
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: external-integration
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/siem-integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "SIEM integration for security event forwarding"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zero-trust-security
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: zero-trust-security
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: security
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/zero-trust-security
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Zero Trust security architecture with policy enforcement"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-engine
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ml-engine
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/ml-engine
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "AI/ML engine for intelligent threat detection"

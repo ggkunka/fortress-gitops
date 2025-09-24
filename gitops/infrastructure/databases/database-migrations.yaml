@@ -1,0 +1,252 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migrations
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: database-migrations
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: database-migrations
+        app.kubernetes.io/component: database
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h postgresql -p 5432 -U mcp_user -d mcp_security; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-credentials
+              key: password
+      containers:
+      - name: migrate
+        image: migrate/migrate:v4.16.2
+        command:
+        - migrate
+        - -path
+        - /migrations
+        - -database
+        - "postgres://mcp_user:$(DB_PASSWORD)@postgresql:5432/mcp_security?sslmode=disable"
+        - up
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-credentials
+              key: password
+        volumeMounts:
+        - name: migrations
+          mountPath: /migrations
+      volumes:
+      - name: migrations
+        configMap:
+          name: database-migrations-scripts
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-migrations-scripts
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: database-migrations-scripts
+    app.kubernetes.io/component: database
+data:
+  001_initial_schema.up.sql: |
+    -- Initial schema migration from shared/database/models/
+    
+    -- Users and authentication
+    CREATE TABLE auth.users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        username VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        hashed_password VARCHAR(255) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        is_verified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Organizations
+    CREATE TABLE auth.organizations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        domain VARCHAR(100),
+        settings JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- User organization relationships
+    CREATE TABLE auth.user_organizations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        role VARCHAR(50) DEFAULT 'member',
+        joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(user_id, organization_id)
+    );
+  
+  002_security_tables.up.sql: |
+    -- Security-related tables
+    
+    -- Scans
+    CREATE TABLE security.scans (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        scan_type VARCHAR(50) NOT NULL,
+        target VARCHAR(500) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        configuration JSONB DEFAULT '{}',
+        results JSONB DEFAULT '{}',
+        started_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Vulnerabilities
+    CREATE TABLE security.vulnerabilities (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        scan_id UUID REFERENCES security.scans(id) ON DELETE CASCADE,
+        cve_id VARCHAR(20),
+        title VARCHAR(500) NOT NULL,
+        description TEXT,
+        severity VARCHAR(20) NOT NULL,
+        cvss_score DECIMAL(3,1),
+        affected_component VARCHAR(200),
+        fix_available BOOLEAN DEFAULT FALSE,
+        fix_version VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Risk assessments
+    CREATE TABLE security.risk_assessments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        vulnerability_id UUID REFERENCES security.vulnerabilities(id) ON DELETE CASCADE,
+        risk_score INTEGER NOT NULL,
+        impact VARCHAR(20) NOT NULL,
+        likelihood VARCHAR(20) NOT NULL,
+        analysis JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  
+  003_reporting_tables.up.sql: |
+    -- Reporting and analytics tables
+    
+    -- Reports
+    CREATE TABLE reporting.reports (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        format VARCHAR(20) NOT NULL,
+        parameters JSONB DEFAULT '{}',
+        content JSONB,
+        file_path VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'pending',
+        generated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  
+  004_integrations_tables.up.sql: |
+    -- External integrations tables
+    
+    -- Integrations
+    CREATE TABLE integrations.external_integrations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id UUID REFERENCES auth.organizations(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        configuration JSONB NOT NULL,
+        credentials JSONB,
+        status VARCHAR(50) DEFAULT 'inactive',
+        last_sync TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  
+  005_plugins_tables.up.sql: |
+    -- Plugin system tables
+    
+    -- Plugins
+    CREATE TABLE plugins.plugins (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        version VARCHAR(20) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        configuration JSONB DEFAULT '{}',
+        status VARCHAR(50) DEFAULT 'inactive',
+        installed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(name, version)
+    );
+  
+  006_indexes_and_constraints.up.sql: |
+    -- Create indexes for performance
+    
+    -- Users indexes
+    CREATE INDEX idx_users_email ON auth.users(email);
+    CREATE INDEX idx_users_username ON auth.users(username);
+    CREATE INDEX idx_users_active ON auth.users(is_active);
+    
+    -- Organizations indexes
+    CREATE INDEX idx_organizations_domain ON auth.organizations(domain);
+    
+    -- Scans indexes
+    CREATE INDEX idx_scans_organization ON security.scans(organization_id);
+    CREATE INDEX idx_scans_type ON security.scans(scan_type);
+    CREATE INDEX idx_scans_status ON security.scans(status);
+    CREATE INDEX idx_scans_created ON security.scans(created_at);
+    
+    -- Vulnerabilities indexes
+    CREATE INDEX idx_vulnerabilities_organization ON security.vulnerabilities(organization_id);
+    CREATE INDEX idx_vulnerabilities_scan ON security.vulnerabilities(scan_id);
+    CREATE INDEX idx_vulnerabilities_cve ON security.vulnerabilities(cve_id);
+    CREATE INDEX idx_vulnerabilities_severity ON security.vulnerabilities(severity);
+    CREATE INDEX idx_vulnerabilities_created ON security.vulnerabilities(created_at);
+    
+    -- Full-text search indexes
+    CREATE INDEX idx_vulnerabilities_title_search ON security.vulnerabilities USING gin(to_tsvector('english', title));
+    CREATE INDEX idx_vulnerabilities_description_search ON security.vulnerabilities USING gin(to_tsvector('english', description));
+    
+    -- Reports indexes
+    CREATE INDEX idx_reports_organization ON reporting.reports(organization_id);
+    CREATE INDEX idx_reports_type ON reporting.reports(type);
+    CREATE INDEX idx_reports_status ON reporting.reports(status);
+    CREATE INDEX idx_reports_created ON reporting.reports(created_at);
+    
+    -- Integrations indexes
+    CREATE INDEX idx_integrations_organization ON integrations.external_integrations(organization_id);
+    CREATE INDEX idx_integrations_type ON integrations.external_integrations(type);
+    CREATE INDEX idx_integrations_status ON integrations.external_integrations(status);
+    
+    -- Plugins indexes
+    CREATE INDEX idx_plugins_name ON plugins.plugins(name);
+    CREATE INDEX idx_plugins_type ON plugins.plugins(type);
+    CREATE INDEX idx_plugins_status ON plugins.plugins(status);

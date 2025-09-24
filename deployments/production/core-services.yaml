@@ -1,0 +1,614 @@
+# Production Deployment for MCP Core Services
+
+---
+# Correlation Engine Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: correlation-engine
+  namespace: mcp-security-platform
+  labels:
+    app: correlation-engine
+    component: core-service
+    version: v2.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: correlation-engine
+  template:
+    metadata:
+      labels:
+        app: correlation-engine
+        component: core-service
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-core-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: correlation-engine
+        image: mcp-platform/correlation-engine:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://jaeger-collector.mcp-monitoring.svc.cluster.local:14268"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: postgresql-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: redis-url
+        - name: VAULT_ADDR
+          value: "https://vault.mcp-security.svc.cluster.local:8200"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets
+          mountPath: /app/secrets
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: correlation-engine-config
+      - name: secrets
+        secret:
+          secretName: correlation-engine-secrets
+
+---
+# Risk Assessment Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-assessment
+  namespace: mcp-security-platform
+  labels:
+    app: risk-assessment
+    component: core-service
+    version: v2.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: risk-assessment
+  template:
+    metadata:
+      labels:
+        app: risk-assessment
+        component: core-service
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-core-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: risk-assessment
+        image: mcp-platform/risk-assessment:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LLM_PROVIDER
+          value: "openai"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-credentials
+              key: openai-api-key
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: postgresql-url
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: model-cache
+          mountPath: /app/models
+      volumes:
+      - name: config
+        configMap:
+          name: risk-assessment-config
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache-pvc
+
+---
+# Response Orchestrator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: response-orchestrator
+  namespace: mcp-security-platform
+  labels:
+    app: response-orchestrator
+    component: core-service
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: response-orchestrator
+  template:
+    metadata:
+      labels:
+        app: response-orchestrator
+        component: core-service
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-response-orchestrator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: response-orchestrator
+        image: mcp-platform/response-orchestrator:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: postgresql-url
+        - name: WORKFLOW_ENGINE
+          value: "kubernetes"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: playbooks
+          mountPath: /app/playbooks
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: response-orchestrator-config
+      - name: playbooks
+        configMap:
+          name: incident-response-playbooks
+
+---
+# Reporting Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-service
+  namespace: mcp-security-platform
+  labels:
+    app: reporting-service
+    component: core-service
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: reporting-service
+  template:
+    metadata:
+      labels:
+        app: reporting-service
+        component: core-service
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-core-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: reporting-service
+        image: mcp-platform/reporting-service:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: postgresql-url
+        - name: CLICKHOUSE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: clickhouse-url
+        - name: MINIO_ENDPOINT
+          value: "minio.mcp-data.svc.cluster.local:9000"
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: access-key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: secret-key
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: report-templates
+          mountPath: /app/templates
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: reporting-service-config
+      - name: report-templates
+        configMap:
+          name: report-templates
+
+---
+# Services for Core Components
+apiVersion: v1
+kind: Service
+metadata:
+  name: correlation-engine
+  namespace: mcp-security-platform
+  labels:
+    app: correlation-engine
+    component: core-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: correlation-engine
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: risk-assessment
+  namespace: mcp-security-platform
+  labels:
+    app: risk-assessment
+    component: core-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: risk-assessment
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: response-orchestrator
+  namespace: mcp-security-platform
+  labels:
+    app: response-orchestrator
+    component: core-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: response-orchestrator
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reporting-service
+  namespace: mcp-security-platform
+  labels:
+    app: reporting-service
+    component: core-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: reporting-service
+
+---
+# Horizontal Pod Autoscalers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: correlation-engine-hpa
+  namespace: mcp-security-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: correlation-engine
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: risk-assessment-hpa
+  namespace: mcp-security-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: risk-assessment
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Pod Disruption Budgets
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: correlation-engine-pdb
+  namespace: mcp-security-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: correlation-engine
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: risk-assessment-pdb
+  namespace: mcp-security-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: risk-assessment
+
+---
+# Service Monitors for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: core-services
+  namespace: mcp-security-platform
+  labels:
+    app: core-services
+spec:
+  selector:
+    matchLabels:
+      component: core-service
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

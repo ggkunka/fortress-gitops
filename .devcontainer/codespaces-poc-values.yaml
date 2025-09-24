@@ -1,0 +1,203 @@
+# MCP Security Platform - GitHub Codespaces POC Configuration
+# Optimized for 2-core, 8GB Codespace environment with fast deployment
+
+global:
+  storageClass: "standard"
+  
+# Lightweight core services for POC demonstration
+gateway:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/ggkunka/mcp-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi" 
+      cpu: "100m"
+  service:
+    type: ClusterIP
+    port: 8000
+
+auth:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/ggkunka/mcp-auth
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+  service:
+    type: ClusterIP
+    port: 8001
+
+ingestion:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/ggkunka/mcp-ingestion
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+enrichment:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/ggkunka/mcp-enrichment
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+analysis:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/ggkunka/mcp-analysis
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# Minimal PostgreSQL for POC data storage
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "mcp_password"
+    username: "mcp_user"
+    password: "mcp_password"
+    database: "mcp_security"
+  primary:
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    persistence:
+      enabled: false  # Use emptyDir for fast POC startup
+      size: 1Gi
+    initdb:
+      scripts:
+        init-poc.sql: |
+          -- Initialize POC database
+          CREATE TABLE IF NOT EXISTS poc_sboms (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255),
+            data JSONB,
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS poc_vulnerabilities (
+            id SERIAL PRIMARY KEY,
+            cve_id VARCHAR(50),
+            severity VARCHAR(20),
+            score DECIMAL(3,1),
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+
+# Lightweight Redis for session/cache management
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "redis_password"
+  master:
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+    persistence:
+      enabled: false  # Use emptyDir for fast POC startup
+  replica:
+    replicaCount: 0  # No replicas for POC
+
+# Disable heavy monitoring services for Codespaces
+prometheus:
+  enabled: false  # Too resource-intensive for POC
+
+grafana:
+  enabled: false  # Too resource-intensive for POC
+
+# Ingress configuration for Codespaces port forwarding
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: mcp-platform-gateway
+              port:
+                number: 8000
+
+# POC-specific configurations
+poc:
+  # Enable demo data generation
+  generateDemoData: true
+  
+  # Sample vulnerabilities for demonstration
+  sampleVulnerabilities:
+    - cve_id: "CVE-2021-44228"
+      severity: "CRITICAL"
+      score: 10.0
+      component: "log4j"
+    - cve_id: "CVE-2021-3807"
+      severity: "CRITICAL" 
+      score: 9.1
+      component: "axios"
+    - cve_id: "CVE-2021-23337"
+      severity: "HIGH"
+      score: 7.2
+      component: "lodash"
+    - cve_id: "CVE-2021-23017"
+      severity: "HIGH"
+      score: 7.7
+      component: "nginx"
+      
+  # Demo credentials
+  defaultCredentials:
+    username: "admin"
+    password: "admin123"
+    
+  # Codespaces-specific settings
+  codespaces:
+    fastStartup: true
+    skipHealthChecks: false
+    resourceOptimized: true
+    timeoutSeconds: 300  # 5 minute timeout max

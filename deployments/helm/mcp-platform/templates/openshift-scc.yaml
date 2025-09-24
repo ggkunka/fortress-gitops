@@ -1,0 +1,50 @@
+{{- if and (eq (include "mcp-platform.isOpenShift" .) "true") .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.create -}}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.name }}
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    kubernetes.io/description: "Security Context Constraints for MCP Security Platform"
+allowHostDirVolumePlugin: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowHostDirVolumePlugin }}
+allowHostIPC: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowHostIPC }}
+allowHostNetwork: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowHostNetwork }}
+allowHostPID: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowHostPID }}
+allowHostPorts: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowHostPorts }}
+allowPrivilegedContainer: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowPrivilegedContainer }}
+allowedCapabilities:
+{{- with .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.allowedCapabilities }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+defaultAddCapabilities:
+{{- with .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.defaultAddCapabilities }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+requiredDropCapabilities:
+{{- with .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.requiredDropCapabilities }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+runAsUser:
+  type: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.runAsUser.type }}
+  {{- if .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.runAsUser.uidRangeMin }}
+  uidRangeMin: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.runAsUser.uidRangeMin }}
+  {{- end }}
+  {{- if .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.runAsUser.uidRangeMax }}
+  uidRangeMax: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.runAsUser.uidRangeMax }}
+  {{- end }}
+seLinuxContext:
+  type: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.seLinuxContext.type }}
+fsGroup:
+  type: {{ .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.fsGroup.type }}
+  {{- if .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.fsGroup.ranges }}
+  ranges:
+  {{- range .Values.kubernetesFlavorConfig.openshift.securityContextConstraints.fsGroup.ranges }}
+  - min: {{ .min }}
+    max: {{ .max }}
+  {{- end }}
+  {{- end }}
+users:
+- system:serviceaccount:{{ .Release.Namespace }}:{{ include "mcp-platform.serviceAccountName" . }}
+{{- end }}

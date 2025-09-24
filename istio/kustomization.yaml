@@ -1,0 +1,122 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: mcp-security-istio
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: mcp-security-platform
+  app.kubernetes.io/part-of: mcp-security
+  app.kubernetes.io/managed-by: kustomize
+  istio.io/rev: default
+
+# Resource ordering
+resources:
+# Base configuration
+- base/namespace.yaml
+
+# Gateway and traffic management
+- gateway/gateway.yaml
+- virtual-services/virtual-service.yaml
+- destination-rules/destination-rules.yaml
+- traffic-management/service-entry.yaml
+- traffic-management/envoy-filter.yaml
+
+# Security policies
+- security/peer-authentication.yaml
+- security/request-authentication.yaml
+- security/authorization-policy.yaml
+
+# Observability
+- observability/telemetry.yaml
+
+# Configuration patches
+patchesStrategicMerge:
+- |-
+  apiVersion: networking.istio.io/v1beta1
+  kind: Gateway
+  metadata:
+    name: mcp-security-gateway
+    namespace: mcp-security
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+# ConfigMap generators for Istio configuration
+configMapGenerator:
+- name: istio-security-config
+  literals:
+  - ENABLE_MTLS=true
+  - ENABLE_AUTHZ=true
+  - ENABLE_TELEMETRY=true
+  - JAEGER_ENDPOINT=http://jaeger-collector.mcp-security-monitoring:14268/api/traces
+  - PROMETHEUS_ENDPOINT=http://prometheus.mcp-security-monitoring:9090
+  - LOG_LEVEL=info
+  - RATE_LIMIT_ENABLED=true
+  - WAF_ENABLED=true
+
+# Secret generators for TLS certificates
+secretGenerator:
+- name: mcp-security-tls
+  type: kubernetes.io/tls
+  options:
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    labels:
+      app.kubernetes.io/component: tls-certificate
+
+# Images (for any custom Envoy filters or extensions)
+images:
+- name: envoy-wasm-security
+  newTag: v1.0.0
+- name: istio-proxy
+  newTag: 1.19.0
+
+# Patches for environment-specific customization
+patchesJson6902:
+- target:
+    group: networking.istio.io
+    version: v1beta1
+    kind: Gateway
+    name: mcp-security-gateway
+    namespace: mcp-security
+  patch: |-
+    - op: replace
+      path: /spec/servers/0/hosts
+      value:
+      - "security.company.com"
+      - "api.security.company.com"
+
+# Namespace transformation
+transformers:
+- |-
+  apiVersion: builtin
+  kind: NamespaceTransformer
+  metadata:
+    name: namespace-transformer
+  namespace: mcp-security
+  setRoleBindingSubjects: allServiceAccounts
+  unsetOnly: false
+  fieldSpecs:
+  - path: metadata/namespace
+    create: true
+
+# Replica count patches for different environments
+replicas:
+- name: istio-proxy
+  count: 3
+
+# Health check configuration
+commonAnnotations:
+  sidecar.istio.io/inject: "true"
+  sidecar.istio.io/proxyCPU: "100m"
+  sidecar.istio.io/proxyMemory: "128Mi"
+  traffic.sidecar.istio.io/includeInboundPorts: "*"
+  traffic.sidecar.istio.io/excludeOutboundPorts: "443,5432,6379,27017"
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "15090"
+  prometheus.io/path: "/stats/prometheus"

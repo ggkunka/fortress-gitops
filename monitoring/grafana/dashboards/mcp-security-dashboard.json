@@ -1,0 +1,459 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "MCP Security Platform - Security Dashboard",
+    "tags": ["mcp", "security", "threats", "vulnerabilities"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 1,
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": [
+        {
+          "name": "severity",
+          "type": "query",
+          "query": "label_values(mcp_vulnerabilities_detected_total, severity)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true,
+          "current": {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Critical Security Alerts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_vulnerabilities_detected_total{severity=\"CRITICAL\"}[1h]))",
+            "legendFormat": "Critical Vulnerabilities (1h)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Authentication Failures",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_authentication_attempts_total{result=\"failure\"}[1h]))",
+            "legendFormat": "Failed Logins (1h)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 50
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Security Events Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_security_events_total[5m])) * 60",
+            "legendFormat": "Events/min"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "cpm"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Threat Detection Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_security_events_total{event_type=\"threat_detected\"}[5m])) * 60",
+            "legendFormat": "Threats/min"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "cpm",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background"
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "Vulnerability Detections by Severity",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_vulnerabilities_detected_total{severity=~\"$severity\"}[24h])) by (severity)",
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ]
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 4
+        }
+      },
+      {
+        "id": 6,
+        "title": "Security Events Timeline",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_security_events_total[5m])) by (event_type)",
+            "legendFormat": "{{event_type}}"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 4
+        }
+      },
+      {
+        "id": 7,
+        "title": "Top Vulnerable Components",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum(increase(mcp_vulnerabilities_detected_total[24h])) by (component))",
+            "legendFormat": "{{component}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "component": "Component",
+                "Value": "Vulnerabilities"
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        }
+      },
+      {
+        "id": 8,
+        "title": "Authentication Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_authentication_attempts_total{result=\"success\"}[5m])) / sum(rate(mcp_authentication_attempts_total[5m])) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "show": true,
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        }
+      },
+      {
+        "id": 9,
+        "title": "Data Ingestion Security Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_data_ingestion_total{status=\"success\"}[5m])) by (data_type)",
+            "legendFormat": "{{data_type}} - Success"
+          },
+          {
+            "expr": "sum(rate(mcp_data_ingestion_total{status=\"error\"}[5m])) by (data_type)",
+            "legendFormat": "{{data_type}} - Error"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Ingestions/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        }
+      },
+      {
+        "id": 10,
+        "title": "Plugin Security Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mcp_plugin_executions_total{status=\"success\"}[5m])) by (plugin_type)",
+            "legendFormat": "{{plugin_type}} - Success"
+          },
+          {
+            "expr": "sum(rate(mcp_plugin_executions_total{status=\"error\"}[5m])) by (plugin_type)",
+            "legendFormat": "{{plugin_type}} - Error"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "yAxes": [
+          {
+            "label": "Executions/sec",
+            "show": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        }
+      },
+      {
+        "id": 11,
+        "title": "Security Alert Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(increase(mcp_security_events_total[1h])) by (event_type)",
+            "legendFormat": "{{event_type}}"
+          }
+        ],
+        "heatmap": {},
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 28
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Critical Security Events",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "increase(mcp_security_events_total{severity=\"critical\"}[5m]) > 0",
+          "iconColor": "red",
+          "tags": ["security", "critical"]
+        }
+      ]
+    }
+  }
+}

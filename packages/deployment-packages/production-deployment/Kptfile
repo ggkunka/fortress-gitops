@@ -1,0 +1,198 @@
+apiVersion: kpt.dev/v1
+kind: Kptfile
+metadata:
+  name: mcp-security-production
+  annotations:
+    config.kubernetes.io/local-config: "true"
+info:
+  description: "Production deployment package for MCP Security Platform"
+  keywords:
+  - production
+  - deployment
+  - mcp-security-platform
+  - complete-stack
+  site: https://github.com/ggkunka/mcp-security-platform
+upstream:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/deployment-packages/production-deployment
+    ref: main
+upstreamLock:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/deployment-packages/production-deployment
+    ref: main
+    commit: HEAD
+dependencies:
+# Infrastructure layer
+- name: istio-service-mesh
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/infrastructure/istio-package
+      ref: main
+  strategy: resource-merge
+- name: databases-infrastructure
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/infrastructure/databases-package
+      ref: main
+  strategy: resource-merge
+- name: monitoring-stack
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/infrastructure/monitoring-package
+      ref: main
+  strategy: resource-merge
+# Core services layer
+- name: mcp-server-service
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/core-services/mcp-server-package
+      ref: main
+  strategy: resource-merge
+- name: auth-service
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/core-services/auth-service-package
+      ref: main
+  strategy: resource-merge
+- name: gateway-service
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/core-services/gateway-package
+      ref: main
+  strategy: resource-merge
+# Application services layer
+- name: security-services
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/applications/security-services-package
+      ref: main
+  strategy: resource-merge
+- name: web-interface
+  upstream:
+    type: git
+    git:
+      repo: https://github.com/ggkunka/mcp-security-platform
+      directory: /packages/platform-packages/applications/web-ui-package
+      ref: main
+  strategy: resource-merge
+pipeline:
+  mutators:
+  # Apply production environment setters
+  - image: gcr.io/kpt-fn/apply-setters:v0.2.0
+    configMap:
+      # Global environment settings
+      environment: production
+      domain: security.company.com
+      image_registry: security.company.com/registry
+      image_tag: v1.0.0
+      
+      # Production scaling settings
+      replicas: "3"
+      high_availability: "true"
+      enable_backups: "true"
+      
+      # Security settings
+      enable_mtls: "true"
+      enable_authorization: "true"
+      enable_tracing: "true"
+      enable_metrics: "true"
+      enable_waf: "true"
+      
+      # Resource allocation for production
+      cpu_requests: 500m
+      memory_requests: 1Gi
+      cpu_limits: 2000m
+      memory_limits: 4Gi
+      
+      # Storage settings
+      storage_class: fast-ssd
+      postgresql_storage_size: 200Gi
+      redis_storage_size: 50Gi
+      
+      # Database configuration
+      postgresql_replicas: "2"
+      postgresql_cpu_requests: 1000m
+      postgresql_memory_requests: 2Gi
+      postgresql_cpu_limits: 4000m
+      postgresql_memory_limits: 8Gi
+      
+      # Monitoring settings
+      log_level: info
+      enable_debug: "false"
+      metrics_retention: 30d
+      
+  # Apply production-specific resource optimizations
+  - image: security.company.com/kpt-functions/resource-optimizer:v1.0.0
+    configMap:
+      environment: production
+      cpu_multiplier: "1.5"
+      memory_multiplier: "2.0"
+      enable_affinity_rules: "true"
+      enable_pod_disruption_budgets: "true"
+      
+  # Generate production certificates
+  - image: security.company.com/kpt-functions/cert-manager:v1.0.0
+    configMap:
+      domain: security.company.com
+      issuer: letsencrypt-prod
+      generate_wildcard: "true"
+      
+  validators:
+  # Validate all Kubernetes resources
+  - image: gcr.io/kpt-fn/kubeval:v0.3.0
+    configMap:
+      strict: "true"
+      ignore_missing_schemas: "false"
+      
+  # Production-specific validations
+  - image: security.company.com/kpt-functions/production-validator:v1.0.0
+    configMap:
+      require_high_availability: "true"
+      require_resource_limits: "true"
+      require_health_checks: "true"
+      require_monitoring: "true"
+      require_backups: "true"
+      min_replicas: "2"
+      
+  # Security validations
+  - image: security.company.com/kpt-functions/security-validator:v1.0.0
+    configMap:
+      strict_mode: "true"
+      require_mtls: "true"
+      require_non_root: "true"
+      require_read_only_fs: "true"
+      require_network_policies: "true"
+      require_pod_security_context: "true"
+      scan_for_vulnerabilities: "true"
+      
+  # Final validation for production readiness
+  - image: security.company.com/kpt-functions/deployment-validator:v1.0.0
+    configMap:
+      environment: production
+      validate_dependencies: "true"
+      validate_configurations: "true"
+      validate_secrets: "true"
+      validate_persistence: "true"
+      
+inventory:
+  namespace: mcp-security
+  name: production-deployment-inventory
+  inventoryID: mcp-security-production

@@ -1,0 +1,270 @@
+version: '3.8'
+
+services:
+  # Core Infrastructure
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-test-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgresql:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: mcp_test
+      POSTGRES_USER: mcp_user
+      POSTGRES_PASSWORD: mcp_test_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./fixtures/sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp_user -d mcp_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Plugin Registry Service
+  plugin-registry:
+    build:
+      context: ../services/plugin-registry
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - PLUGIN_DIRECTORIES=/opt/mcp/plugins
+    volumes:
+      - ../plugins:/opt/mcp/plugins
+      - ./fixtures/plugins:/opt/mcp/test-plugins
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ingestion Service
+  ingestion-service:
+    build:
+      context: ../services/ingestion
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enrichment Service
+  enrichment-service:
+    build:
+      context: ../services/enrichment
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+      - PLUGIN_REGISTRY_URL=http://plugin-registry:8090
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      plugin-registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Analysis Service
+  analysis-service:
+    build:
+      context: ../services/analysis
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+      - PLUGIN_REGISTRY_URL=http://plugin-registry:8090
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      enrichment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../services/notification
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../services/auth
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+      - JWT_SECRET_KEY=test-secret-key-for-testing-only
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Gateway Service
+  gateway-service:
+    build:
+      context: ../services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=test
+      - AUTH_SERVICE_URL=http://auth-service:8085
+      - INGESTION_SERVICE_URL=http://ingestion-service:8080
+      - ENRICHMENT_SERVICE_URL=http://enrichment-service:8082
+      - ANALYSIS_SERVICE_URL=http://analysis-service:8083
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8084
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Test Runner Container
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - .:/app/tests
+      - ../:/app/platform
+    environment:
+      - GATEWAY_URL=http://gateway-service:8081
+      - AUTH_SERVICE_URL=http://auth-service:8085
+      - INGESTION_SERVICE_URL=http://ingestion-service:8080
+      - ENRICHMENT_SERVICE_URL=http://enrichment-service:8082
+      - ANALYSIS_SERVICE_URL=http://analysis-service:8083
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8084
+      - PLUGIN_REGISTRY_URL=http://plugin-registry:8090
+      - DATABASE_URL=postgresql://mcp_user:mcp_test_password@postgresql:5432/mcp_test
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+      ingestion-service:
+        condition: service_healthy
+      enrichment-service:
+        condition: service_healthy
+      analysis-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      plugin-registry:
+        condition: service_healthy
+    command: tail -f /dev/null  # Keep container running for interactive testing
+
+  # Monitoring for Tests
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./fixtures/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./fixtures/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./fixtures/grafana/provisioning:/etc/grafana/provisioning
+
+volumes:
+  redis-test-data:
+  postgres-test-data:
+
+networks:
+  default:
+    name: mcp-test-network

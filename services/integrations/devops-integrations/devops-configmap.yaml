@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-devops-code
+  namespace: fortress-system
+data:
+  main.py: |
+    from fastapi import FastAPI
+    from datetime import datetime
+    import uvicorn
+    
+    app = FastAPI(title="Fortress DevOps Integration Service", version="1.0.0")
+    
+    devops_platforms = {
+        "jenkins": {"name": "Jenkins Main", "url": "http://jenkins.fortress.local", "status": "connected"},
+        "gitlab": {"name": "GitLab CI/CD", "url": "http://gitlab.fortress.local", "status": "connected"},
+        "github": {"name": "GitHub Actions", "url": "https://api.github.com", "status": "connected"}
+    }
+    
+    @app.get("/platforms")
+    async def list_platforms():
+        return {"platforms": devops_platforms, "total": len(devops_platforms)}
+    
+    @app.post("/scan/{platform}")
+    async def trigger_scan(platform: str, job_config: dict = {}):
+        if platform not in devops_platforms:
+            return {"error": "Platform not found"}
+        
+        scan_id = f"scan-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        return {
+            "scan_id": scan_id,
+            "platform": platform,
+            "status": "initiated",
+            "job_name": job_config.get("job_name", "security-scan")
+        }
+    
+    @app.get("/scans")
+    async def list_scans():
+        return {
+            "scans": [
+                {"id": "scan-001", "platform": "jenkins", "status": "PASSED", "vulnerabilities": 3},
+                {"id": "scan-002", "platform": "gitlab", "status": "FAILED", "vulnerabilities": 12}
+            ]
+        }
+    
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy", "service": "devops-integration"}
+    
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=8094)

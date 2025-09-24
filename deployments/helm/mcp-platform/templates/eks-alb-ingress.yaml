@@ -1,0 +1,62 @@
+{{- if and (eq (include "mcp-platform.isEKS" .) "true") .Values.kubernetesFlavorConfig.eks.alb.enabled -}}
+{{- $fullName := include "mcp-platform.fullname" . -}}
+{{- $svcPort := .Values.services.gateway.service.port -}}
+{{- $ingressApiVersion := include "mcp-platform.ingress.apiVersion" . -}}
+apiVersion: {{ $ingressApiVersion }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-alb
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    # ALB-specific annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: {{ .Values.kubernetesFlavorConfig.eks.alb.scheme }}
+    alb.ingress.kubernetes.io/target-type: {{ .Values.kubernetesFlavorConfig.eks.alb.targetType }}
+    alb.ingress.kubernetes.io/load-balancer-name: {{ $fullName }}-alb
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    {{- if .Values.kubernetesFlavorConfig.eks.alb.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.kubernetesFlavorConfig.eks.alb.certificateArn }}
+    alb.ingress.kubernetes.io/ssl-policy: {{ .Values.kubernetesFlavorConfig.eks.alb.sslPolicy }}
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    {{- end }}
+    # Security annotations
+    alb.ingress.kubernetes.io/security-groups: {{ include "mcp-platform.fullname" . }}-alb-sg
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+    # Health check configuration
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    # Performance and routing
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http2.enabled=true,idle_timeout.timeout_seconds=60
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: Prefix
+            backend:
+              {{- if semverCompare ">=1.19.0" $.Capabilities.KubeVersion.Version }}
+              service:
+                name: {{ .service.name | default (printf "%s-gateway" $fullName) }}
+                port:
+                  number: {{ .service.port | default $svcPort }}
+              {{- else }}
+              serviceName: {{ .service.name | default (printf "%s-gateway" $fullName) }}
+              servicePort: {{ .service.port | default $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

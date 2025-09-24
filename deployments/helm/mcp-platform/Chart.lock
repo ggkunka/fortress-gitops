@@ -1,0 +1,33 @@
+dependencies:
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 18.1.5
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 13.2.24
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 25.8.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 7.0.17
+- name: ingestion-service
+  repository: file://./charts/ingestion-service
+  version: 1.0.0
+- name: enrichment-service
+  repository: file://./charts/enrichment-service
+  version: 1.0.0
+- name: analysis-service
+  repository: file://./charts/analysis-service
+  version: 1.0.0
+- name: notification-service
+  repository: file://./charts/notification-service
+  version: 1.0.0
+- name: auth-service
+  repository: file://./charts/auth-service
+  version: 1.0.0
+- name: gateway-service
+  repository: file://./charts/gateway-service
+  version: 1.0.0
+digest: sha256:f3bf17d28ab7696ddc352d7099924364638da9ac749fafc2dd8045c83910c52b
+generated: "2025-07-20T13:19:42.470469181+05:30"

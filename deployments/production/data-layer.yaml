@@ -1,0 +1,1034 @@
+# Production Deployment for MCP Data Layer
+
+---
+# PostgreSQL Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: mcp-data
+  labels:
+    app: postgresql
+    component: database
+    version: v14.9.0
+spec:
+  serviceName: postgresql
+  replicas: 3
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+        component: database
+        version: v14.9.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+      - name: postgresql
+        image: postgres:14.9-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5432
+          name: postgresql
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          value: "mcp_security"
+        - name: POSTGRES_USER
+          value: "mcp_user"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-credentials
+              key: password
+        - name: POSTGRES_REPLICATION_MODE
+          value: master
+        - name: POSTGRES_REPLICATION_USER
+          value: replicator
+        - name: POSTGRES_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-credentials
+              key: replication-password
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "mcp_user" -d "mcp_security" -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "mcp_user" -d "mcp_security" -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:v0.13.2
+        ports:
+        - containerPort: 9187
+          name: metrics
+        env:
+        - name: DATA_SOURCE_NAME
+          value: "postgresql://mcp_user:$(POSTGRES_PASSWORD)@localhost:5432/mcp_security?sslmode=disable"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: postgresql-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: ssd-storage
+
+---
+# MongoDB Replica Set
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: mcp-data
+  labels:
+    app: mongodb
+    component: database
+    version: v6.0.8
+spec:
+  serviceName: mongodb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        component: database
+        version: v6.0.8
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9216"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+      - name: mongodb
+        image: mongo:6.0.8
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 27017
+          name: mongodb
+          protocol: TCP
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "admin"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-credentials
+              key: root-password
+        - name: MONGO_INITDB_DATABASE
+          value: "mcp_sbom"
+        command:
+        - mongod
+        - --replSet=rs0
+        - --bind_ip_all
+        - --auth
+        - --keyFile=/etc/mongodb/mongodb-keyfile
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data/db
+        - name: keyfile
+          mountPath: /etc/mongodb
+          readOnly: true
+      - name: mongodb-exporter
+        image: percona/mongodb_exporter:0.39.0
+        ports:
+        - containerPort: 9216
+          name: metrics
+        env:
+        - name: MONGODB_URI
+          value: "mongodb://admin:$(MONGO_ROOT_PASSWORD)@localhost:27017/admin"
+        - name: MONGO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-credentials
+              key: root-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: keyfile
+        secret:
+          secretName: mongodb-keyfile
+          defaultMode: 0400
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 200Gi
+      storageClassName: ssd-storage
+
+---
+# InfluxDB Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: influxdb
+  namespace: mcp-data
+  labels:
+    app: influxdb
+    component: timeseries
+    version: v2.7.1
+spec:
+  serviceName: influxdb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+        component: timeseries
+        version: v2.7.1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8086"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: influxdb
+        image: influxdb:2.7.1-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8086
+          name: http
+          protocol: TCP
+        env:
+        - name: INFLUXDB_DB
+          value: "mcp_metrics"
+        - name: INFLUXDB_ADMIN_USER
+          value: "admin"
+        - name: INFLUXDB_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials
+              key: admin-password
+        - name: INFLUXDB_USER
+          value: "mcp_user"
+        - name: INFLUXDB_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-credentials
+              key: user-password
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/influxdb2
+        - name: config
+          mountPath: /etc/influxdb2/influxdb.conf
+          subPath: influxdb.conf
+      volumes:
+      - name: config
+        configMap:
+          name: influxdb-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: ssd-storage
+
+---
+# ClickHouse Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: mcp-data
+  labels:
+    app: clickhouse
+    component: analytics
+    version: v23.7.4
+spec:
+  serviceName: clickhouse
+  replicas: 3
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+        component: analytics
+        version: v23.7.4
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9363"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      containers:
+      - name: clickhouse
+        image: clickhouse/clickhouse-server:23.7.4-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8123
+          name: http
+          protocol: TCP
+        - containerPort: 9000
+          name: native
+          protocol: TCP
+        - containerPort: 9009
+          name: inter-server
+          protocol: TCP
+        env:
+        - name: CLICKHOUSE_DB
+          value: "mcp_analytics"
+        - name: CLICKHOUSE_USER
+          value: "default"
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/clickhouse
+        - name: config
+          mountPath: /etc/clickhouse-server/config.xml
+          subPath: config.xml
+        - name: users
+          mountPath: /etc/clickhouse-server/users.xml
+          subPath: users.xml
+      - name: clickhouse-exporter
+        image: f1yegor/clickhouse-exporter:latest
+        ports:
+        - containerPort: 9363
+          name: metrics
+        env:
+        - name: CLICKHOUSE_URL
+          value: "http://localhost:8123/"
+        - name: CLICKHOUSE_USER
+          value: "default"
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: clickhouse-config
+      - name: users
+        configMap:
+          name: clickhouse-users
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Ti
+      storageClassName: ssd-storage
+
+---
+# Neo4j Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: mcp-data
+  labels:
+    app: neo4j
+    component: graph
+    version: v5.11.0
+spec:
+  serviceName: neo4j
+  replicas: 3
+  selector:
+    matchLabels:
+      app: neo4j
+  template:
+    metadata:
+      labels:
+        app: neo4j
+        component: graph
+        version: v5.11.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2004"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 7474
+        runAsGroup: 7474
+        fsGroup: 7474
+      containers:
+      - name: neo4j
+        image: neo4j:5.11.0-enterprise
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 7474
+          name: http
+          protocol: TCP
+        - containerPort: 7687
+          name: bolt
+          protocol: TCP
+        - containerPort: 2004
+          name: metrics
+          protocol: TCP
+        env:
+        - name: NEO4J_AUTH
+          value: "neo4j/$(NEO4J_PASSWORD)"
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: neo4j-credentials
+              key: password
+        - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
+          value: "yes"
+        - name: NEO4J_server_default__database
+          value: "mcp_dependencies"
+        - name: NEO4J_server_memory_heap_initial__size
+          value: "2G"
+        - name: NEO4J_server_memory_heap_max__size
+          value: "4G"
+        - name: NEO4J_server_memory_pagecache_size
+          value: "2G"
+        - name: NEO4J_metrics_enabled
+          value: "true"
+        - name: NEO4J_metrics_prometheus_enabled
+          value: "true"
+        - name: NEO4J_metrics_prometheus_endpoint
+          value: "0.0.0.0:2004"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 6Gi
+          limits:
+            cpu: 4000m
+            memory: 12Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 7474
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 7474
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        - name: plugins
+          mountPath: /plugins
+      volumes:
+      - name: plugins
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: ssd-storage
+
+---
+# Redis Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: mcp-data
+  labels:
+    app: redis
+    component: cache
+    version: v7.0.12
+spec:
+  serviceName: redis
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cache
+        version: v7.0.12
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+      - name: redis
+        image: redis:7.0.12-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        - containerPort: 16379
+          name: cluster
+          protocol: TCP
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        - --cluster-enabled
+        - "yes"
+        - --cluster-config-file
+        - "/data/nodes.conf"
+        - --cluster-node-timeout
+        - "5000"
+        - --appendonly
+        - "yes"
+        - --requirepass
+        - "$(REDIS_PASSWORD)"
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - "$(REDIS_PASSWORD)"
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - "$(REDIS_PASSWORD)"
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /etc/redis
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.52.0-alpine
+        ports:
+        - containerPort: 9121
+          name: metrics
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: ssd-storage
+
+---
+# MinIO Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: mcp-data
+  labels:
+    app: minio
+    component: object-storage
+    version: v2023.8.29
+spec:
+  serviceName: minio
+  replicas: 4
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: object-storage
+        version: v2023.8.29
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9000"
+        prometheus.io/path: "/minio/v2/metrics/cluster"
+    spec:
+      serviceAccountName: mcp-data-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2023-08-29T23-07-35Z
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+          name: api
+          protocol: TCP
+        - containerPort: 9001
+          name: console
+          protocol: TCP
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - minio server http://minio-{0...3}.minio.mcp-data.svc.cluster.local/data --console-address ":9001"
+        env:
+        - name: MINIO_ROOT_USER
+          value: "admin"
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: root-password
+        - name: MINIO_PROMETHEUS_AUTH_TYPE
+          value: "public"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Ti
+      storageClassName: ssd-storage
+
+---
+# Services for Data Layer Components
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: mcp-data
+  labels:
+    app: postgresql
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  - port: 9187
+    targetPort: 9187
+    protocol: TCP
+    name: metrics
+  selector:
+    app: postgresql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: mcp-data
+  labels:
+    app: mongodb
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+  - port: 9216
+    targetPort: 9216
+    protocol: TCP
+    name: metrics
+  selector:
+    app: mongodb
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+  namespace: mcp-data
+  labels:
+    app: influxdb
+    component: timeseries
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8086
+    targetPort: 8086
+    protocol: TCP
+    name: http
+  selector:
+    app: influxdb
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: mcp-data
+  labels:
+    app: clickhouse
+    component: analytics
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8123
+    targetPort: 8123
+    protocol: TCP
+    name: http
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: native
+  - port: 9363
+    targetPort: 9363
+    protocol: TCP
+    name: metrics
+  selector:
+    app: clickhouse
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  namespace: mcp-data
+  labels:
+    app: neo4j
+    component: graph
+spec:
+  type: ClusterIP
+  ports:
+  - port: 7474
+    targetPort: 7474
+    protocol: TCP
+    name: http
+  - port: 7687
+    targetPort: 7687
+    protocol: TCP
+    name: bolt
+  - port: 2004
+    targetPort: 2004
+    protocol: TCP
+    name: metrics
+  selector:
+    app: neo4j
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: mcp-data
+  labels:
+    app: redis
+    component: cache
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  - port: 9121
+    targetPort: 9121
+    protocol: TCP
+    name: metrics
+  selector:
+    app: redis
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: mcp-data
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: api
+  - port: 9001
+    targetPort: 9001
+    protocol: TCP
+    name: console
+  selector:
+    app: minio
+
+---
+# Storage Classes
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ssd-storage
+  labels:
+    storage-tier: performance
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+  zones: us-central1-a,us-central1-b,us-central1-c
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: data-layer
+  namespace: mcp-data
+  labels:
+    app: data-layer
+spec:
+  selector:
+    matchLabels:
+      component: database
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

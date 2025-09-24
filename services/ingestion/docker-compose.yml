@@ -1,0 +1,199 @@
+# Docker Compose for MCP Security Platform - Ingestion Service
+version: '3.8'
+
+services:
+  # Redis for event bus
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-ingestion-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mcp-ingestion
+
+  # Ingestion service - development
+  ingestion-dev:
+    build:
+      context: .
+      dockerfile: Containerfile
+      target: development
+    container_name: mcp-ingestion-service-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+      - HOST=0.0.0.0
+      - PORT=8080
+    volumes:
+      - .:/app:delegated
+      - /app/__pycache__
+      - /app/.pytest_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mcp-ingestion
+    restart: unless-stopped
+
+  # Ingestion service - production
+  ingestion-prod:
+    build:
+      context: .
+      dockerfile: Containerfile
+      target: production
+    container_name: mcp-ingestion-service-prod
+    ports:
+      - "8081:8080"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - HOST=0.0.0.0
+      - PORT=8080
+      - WORKERS=4
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mcp-ingestion
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Testing service
+  ingestion-test:
+    build:
+      context: .
+      dockerfile: Containerfile
+      target: testing
+    container_name: mcp-ingestion-service-test
+    environment:
+      - ENVIRONMENT=testing
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app:delegated
+      - test_results:/app/test-results
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mcp-ingestion
+    profiles:
+      - testing
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mcp-ingestion-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - mcp-ingestion
+    profiles:
+      - monitoring
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mcp-ingestion-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - mcp-ingestion
+    profiles:
+      - monitoring
+
+  # Redis Insight for Redis management
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: mcp-ingestion-redis-insight
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis_insight_data:/db
+    depends_on:
+      - redis
+    networks:
+      - mcp-ingestion
+    profiles:
+      - tools
+
+  # Nginx for load balancing (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: mcp-ingestion-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - ingestion-dev
+    networks:
+      - mcp-ingestion
+    profiles:
+      - loadbalancer
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  redis_insight_data:
+    driver: local
+  test_results:
+    driver: local
+
+networks:
+  mcp-ingestion:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

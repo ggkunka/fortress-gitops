@@ -1,0 +1,108 @@
+# Harbor Istio Service Mesh Configuration
+
+# Istio Gateway for Harbor External Access
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: harbor-gateway
+  namespace: harbor-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http-harbor-ui
+      protocol: HTTP
+    hosts:
+    - harbor.fortress.local
+    - "10.63.89.182"
+  - port:
+      number: 5000
+      name: http-registry
+      protocol: HTTP
+    hosts:
+    - registry.fortress.local
+    - "10.63.89.182"
+
+---
+# VirtualService for Harbor UI
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: harbor-ui
+  namespace: harbor-system
+spec:
+  hosts:
+  - harbor.fortress.local
+  - "10.63.89.182"
+  gateways:
+  - harbor-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: harbor-registry.harbor-system.svc.cluster.local
+        port:
+          number: 80
+
+---
+# VirtualService for Docker Registry API
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: harbor-registry
+  namespace: harbor-system
+spec:
+  hosts:
+  - registry.fortress.local
+  - "10.63.89.182"
+  gateways:
+  - harbor-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /v2/
+    route:
+    - destination:
+        host: harbor-registry.harbor-system.svc.cluster.local
+        port:
+          number: 5000
+
+---
+# DestinationRule for Harbor with mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: harbor-registry
+  namespace: harbor-system
+spec:
+  host: harbor-registry.harbor-system.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL  # Enable mTLS
+  portLevelSettings:
+  - port:
+      number: 80
+    tls:
+      mode: ISTIO_MUTUAL
+  - port:
+      number: 5000
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+# PeerAuthentication for strict mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: harbor-mtls
+  namespace: harbor-system
+spec:
+  selector:
+    matchLabels:
+      app: harbor-registry
+  mtls:
+    mode: STRICT

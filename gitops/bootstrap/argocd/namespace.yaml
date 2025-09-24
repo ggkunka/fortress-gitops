@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: mcp-security-platform
+    istio-injection: enabled
+  annotations:
+    argocd.argoproj.io/managed: "true"

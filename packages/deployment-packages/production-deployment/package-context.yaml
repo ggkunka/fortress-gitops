@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kptfile.kpt.dev
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  name: mcp-security-production
+  package-path: deployment-packages/production-deployment
+  # Global production configuration
+  environment: production # {"$kpt-set":"environment"}
+  domain: security.company.com # {"$kpt-set":"domain"}
+  image_registry: security.company.com/registry # {"$kpt-set":"image_registry"}
+  image_tag: v1.0.0 # {"$kpt-set":"image_tag"}
+  
+  # High availability configuration
+  replicas: "3" # {"$kpt-set":"replicas"}
+  high_availability: "true" # {"$kpt-set":"high_availability"}
+  enable_backups: "true" # {"$kpt-set":"enable_backups"}
+  
+  # Security configuration
+  enable_mtls: "true" # {"$kpt-set":"enable_mtls"}
+  enable_authorization: "true" # {"$kpt-set":"enable_authorization"}
+  enable_tracing: "true" # {"$kpt-set":"enable_tracing"}
+  enable_metrics: "true" # {"$kpt-set":"enable_metrics"}
+  enable_waf: "true" # {"$kpt-set":"enable_waf"}
+  
+  # Resource allocation
+  cpu_requests: 500m # {"$kpt-set":"cpu_requests"}
+  memory_requests: 1Gi # {"$kpt-set":"memory_requests"}
+  cpu_limits: 2000m # {"$kpt-set":"cpu_limits"}
+  memory_limits: 4Gi # {"$kpt-set":"memory_limits"}
+  
+  # Storage configuration
+  storage_class: fast-ssd # {"$kpt-set":"storage_class"}
+  postgresql_storage_size: 200Gi # {"$kpt-set":"postgresql_storage_size"}
+  redis_storage_size: 50Gi # {"$kpt-set":"redis_storage_size"}
+  
+  # Database scaling
+  postgresql_replicas: "2" # {"$kpt-set":"postgresql_replicas"}
+  postgresql_cpu_requests: 1000m # {"$kpt-set":"postgresql_cpu_requests"}
+  postgresql_memory_requests: 2Gi # {"$kpt-set":"postgresql_memory_requests"}
+  postgresql_cpu_limits: 4000m # {"$kpt-set":"postgresql_cpu_limits"}
+  postgresql_memory_limits: 8Gi # {"$kpt-set":"postgresql_memory_limits"}
+  
+  # Monitoring configuration
+  log_level: info # {"$kpt-set":"log_level"}
+  enable_debug: "false" # {"$kpt-set":"enable_debug"}
+  metrics_retention: 30d # {"$kpt-set":"metrics_retention"}
+  
+  # Backup configuration
+  backup_retention_days: "90" # {"$kpt-set":"backup_retention_days"}
+  backup_schedule: "0 2 * * *" # {"$kpt-set":"backup_schedule"}
+  
+  # TLS configuration
+  tls_issuer: letsencrypt-prod # {"$kpt-set":"tls_issuer"}
+  tls_min_version: "1.2" # {"$kpt-set":"tls_min_version"}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-info
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  description: |
+    Production deployment package for MCP Security Platform
+    
+    This package orchestrates the complete MCP Security Platform deployment including:
+    
+    Infrastructure Layer:
+    - Istio service mesh with production security policies
+    - PostgreSQL and Redis databases with high availability
+    - Monitoring stack (Prometheus, Grafana, Jaeger, Kiali)
+    
+    Platform Services:
+    - MCP protocol server with security tools
+    - Authentication and authorization service
+    - API gateway with rate limiting and WAF
+    - Notification and event processing services
+    
+    Application Services:
+    - Security scanning and vulnerability analysis
+    - Risk assessment and correlation engine
+    - Report generation and visualization
+    - External integrations (SIEM, Cloud, Threat feeds)
+    - Plugin marketplace and management
+    - React web interface
+    
+    Production Features:
+    - High availability with multiple replicas
+    - Automated backups and disaster recovery
+    - Comprehensive monitoring and alerting
+    - Zero-trust security with mTLS
+    - Horizontal pod autoscaling
+    - Resource quotas and limits
+    - Network policies and security contexts
+    
+    Usage:
+    1. Fetch this package: kpt pkg get <repo>/packages/deployment-packages/production-deployment
+    2. Configure environment: kpt fn eval --image gcr.io/kpt-fn/apply-setters:v0.2.0 -- domain=your-domain.com
+    3. Validate: kpt fn eval --image gcr.io/kpt-fn/validate:v0.2.0
+    4. Deploy: kubectl apply -f .
+  
+  version: "1.0.0"
+  target_environment: "production"
+  minimum_kubernetes_version: "1.24"
+  required_storage_classes: "fast-ssd"
+  estimated_resource_usage: "16 CPU cores, 32GB RAM, 500GB storage"
+  maintainer: "MCP Security Platform Team"
+  repository: "https://github.com/ggkunka/mcp-security-platform"

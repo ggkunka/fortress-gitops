@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fortress-database-security
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: main
+    path: database/deployment
+    directory:
+      include: "database-istio-security.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fortress-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m0s
+  revisionHistoryLimit: 10

@@ -1,0 +1,127 @@
+{
+  "fortress_security_events": {
+    "settings": {
+      "number_of_shards": 3,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": {"type": "date"},
+        "cluster_id": {"type": "keyword"},
+        "namespace": {"type": "keyword"},
+        "event_type": {"type": "keyword"},
+        "severity": {"type": "keyword"},
+        "source_ip": {"type": "ip"},
+        "destination_ip": {"type": "ip"},
+        "process_name": {"type": "keyword"},
+        "process_pid": {"type": "long"},
+        "file_path": {"type": "text"},
+        "network_protocol": {"type": "keyword"},
+        "threat_indicators": {"type": "text"},
+        "raw_event": {"type": "text"},
+        "agent_id": {"type": "keyword"}
+      }
+    }
+  },
+  "fortress_vulnerability_events": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": {"type": "date"},
+        "scan_timestamp": {"type": "date"},
+        "cve_id": {"type": "keyword"},
+        "severity": {"type": "keyword"},
+        "cvss_score": {"type": "float"},
+        "exploitability": {"type": "float"},
+        "cluster_id": {"type": "keyword"},
+        "namespace": {"type": "keyword"},
+        "workload_name": {"type": "keyword"},
+        "image_name": {"type": "keyword"},
+        "component_name": {"type": "keyword"},
+        "component_version": {"type": "keyword"},
+        "vulnerability_source": {"type": "keyword"},
+        "remediation_status": {"type": "keyword"},
+        "exploit_available": {"type": "boolean"},
+        "description": {"type": "text"}
+      }
+    }
+  },
+  "fortress_scan_logs": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": {"type": "date"},
+        "execution_id": {"type": "keyword"},
+        "cluster_id": {"type": "keyword"},
+        "namespace": {"type": "keyword"},
+        "tenant_id": {"type": "keyword"},
+        "scan_phase": {"type": "keyword"},
+        "scan_type": {"type": "keyword"},
+        "tool_name": {"type": "keyword"},
+        "scan_status": {"type": "keyword"},
+        "duration_seconds": {"type": "long"},
+        "findings_count": {"type": "long"},
+        "critical_findings": {"type": "long"},
+        "performance_impact": {
+          "properties": {
+            "cpu_usage": {"type": "float"},
+            "memory_usage": {"type": "float"},
+            "scan_overhead": {"type": "float"}
+          }
+        },
+        "agent_id": {"type": "keyword"},
+        "error_message": {"type": "text"}
+      }
+    }
+  },
+  "fortress_audit_logs": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": {"type": "date"},
+        "user_id": {"type": "keyword"},
+        "user_role": {"type": "keyword"},
+        "action": {"type": "keyword"},
+        "resource": {"type": "keyword"},
+        "resource_id": {"type": "keyword"},
+        "outcome": {"type": "keyword"},
+        "client_ip": {"type": "ip"},
+        "user_agent": {"type": "text"},
+        "session_id": {"type": "keyword"},
+        "request_details": {"type": "object"},
+        "response_code": {"type": "integer"}
+      }
+    }
+  },
+  "fortress_compliance_events": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": {"type": "date"},
+        "assessment_id": {"type": "keyword"},
+        "cluster_id": {"type": "keyword"},
+        "framework": {"type": "keyword"},
+        "control_number": {"type": "keyword"},
+        "control_title": {"type": "text"},
+        "compliance_status": {"type": "keyword"},
+        "finding_severity": {"type": "keyword"},
+        "remediation_required": {"type": "boolean"},
+        "evidence_location": {"type": "keyword"},
+        "assessor": {"type": "keyword"}
+      }
+    }
+  }
+}

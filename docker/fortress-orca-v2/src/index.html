@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fortress Security Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+<nav class="topbar">
+<div class="logo"><i class="fas fa-shield-alt"></i> Fortress Security</div>
+<div class="search-box"><input placeholder="Search assets, vulnerabilities..." /></div>
+<div class="user-menu"><i class="fas fa-user-circle"></i></div>
+</nav>
+<div class="app-body">
+<aside class="sidebar">
+<div class="nav-section">
+<h3>Overview</h3>
+<div class="nav-item active"><i class="fas fa-chart-line"></i> Dashboard</div>
+<div class="nav-item"><i class="fas fa-server"></i> Assets <span class="badge">1,247</span></div>
+</div>
+<div class="nav-section">
+<h3>Security</h3>
+<div class="nav-item"><i class="fas fa-bug"></i> Vulnerabilities <span class="badge critical">23</span></div>
+<div class="nav-item"><i class="fas fa-check"></i> Compliance <span class="badge success">94%</span></div>
+<div class="nav-item"><i class="fas fa-exclamation-triangle"></i> Threats</div>
+</div>
+<div class="nav-section">
+<h3>Operations</h3>
+<div class="nav-item"><i class="fas fa-robot"></i> Agents <span class="badge">45</span></div>
+<div class="nav-item"><i class="fas fa-search"></i> Scans <span class="badge">12</span></div>
+</div>
+</aside>
+<main class="content">
+<div class="page-header">
+<h1>Security Dashboard</h1>
+<p>Real-time security posture and threat intelligence</p>
+</div>
+<div class="stats-grid">
+<div class="stat-card">
+<div class="stat-icon success"><i class="fas fa-shield-check"></i></div>
+<div class="stat-info">
+<div class="stat-value" id="security-score">87.3%</div>
+<div class="stat-label">Security Score</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon"><i class="fas fa-server"></i></div>
+<div class="stat-info">
+<div class="stat-value" id="total-assets">1,247</div>
+<div class="stat-label">Total Assets</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon critical"><i class="fas fa-exclamation-circle"></i></div>
+<div class="stat-info">
+<div class="stat-value" id="critical-alerts">23</div>
+<div class="stat-label">Critical Alerts</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon success"><i class="fas fa-robot"></i></div>
+<div class="stat-info">
+<div class="stat-value" id="active-agents">45</div>
+<div class="stat-label">Active Agents</div>
+</div>
+</div>
+</div>
+<div class="content-grid">
+<div class="panel">
+<h2>Security Agents</h2>
+<div class="agent-list" id="agent-list"></div>
+</div>
+<div class="panel">
+<h2>Recent Vulnerabilities</h2>
+<div class="vuln-list" id="vuln-list"></div>
+</div>
+</div>
+</main>
+</div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

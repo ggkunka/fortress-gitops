@@ -1,0 +1,119 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+!scripts/build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+*.tar
+*.img
+
+# Kubernetes
+*.kubeconfig
+kubeconfig*
+
+# Security
+.env
+.env.local
+.env.production
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Helm
+charts/*/charts/
+charts/*/requirements.lock
+charts/*/Chart.lock
+
+# Buildah/Podman
+.buildah/
+.podman/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Configuration
+config.local.yaml
+config.production.yaml
+.config/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+site/
+
+# Container images
+*.tar.gz
+*.tgz
+
+# State files
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Application specific
+mcp_server.db
+scan_results/
+vulnerability_reports/
+audit_logs/

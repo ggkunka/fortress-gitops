@@ -1,0 +1,1003 @@
+# Production Monitoring and Observability Stack
+
+---
+# Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: mcp-monitoring
+  labels:
+    app: prometheus
+    component: monitoring
+    version: v2.46.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        component: monitoring
+        version: v2.46.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.46.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9090
+          name: web
+          protocol: TCP
+        args:
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        - "--storage.tsdb.path=/prometheus"
+        - "--storage.tsdb.retention.time=90d"
+        - "--storage.tsdb.retention.size=100GB"
+        - "--web.console.libraries=/etc/prometheus/console_libraries"
+        - "--web.console.templates=/etc/prometheus/consoles"
+        - "--web.enable-lifecycle"
+        - "--web.enable-admin-api"
+        - "--log.level=info"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 4
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: storage
+          mountPath: /prometheus
+        - name: rules
+          mountPath: /etc/prometheus/rules
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: rules
+        configMap:
+          name: prometheus-rules
+      - name: storage
+        persistentVolumeClaim:
+          claimName: prometheus-storage
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: mcp-monitoring
+  labels:
+    app: grafana
+    component: visualization
+    version: v10.1.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        component: visualization
+        version: v10.1.0
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: admin-password
+        - name: GF_DATABASE_TYPE
+          value: "postgres"
+        - name: GF_DATABASE_HOST
+          value: "postgresql.mcp-data.svc.cluster.local:5432"
+        - name: GF_DATABASE_NAME
+          value: "grafana"
+        - name: GF_DATABASE_USER
+          value: "grafana"
+        - name: GF_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: db-password
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-piechart-panel,grafana-worldmap-panel,grafana-kubernetes-app"
+        - name: GF_SECURITY_COOKIE_SECURE
+          value: "true"
+        - name: GF_SECURITY_COOKIE_SAMESITE
+          value: "strict"
+        - name: GF_SERVER_ROOT_URL
+          value: "https://grafana.mcp-security-platform.local"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: storage
+          mountPath: /var/lib/grafana
+        - name: config
+          mountPath: /etc/grafana
+        - name: dashboards
+          mountPath: /var/lib/grafana/dashboards
+      volumes:
+      - name: config
+        configMap:
+          name: grafana-config
+      - name: dashboards
+        configMap:
+          name: grafana-dashboards
+      - name: storage
+        persistentVolumeClaim:
+          claimName: grafana-storage
+
+---
+# Jaeger All-in-One Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: mcp-monitoring
+  labels:
+    app: jaeger
+    component: tracing
+    version: v1.48.0
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: tracing
+        version: v1.48.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "14269"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: jaeger
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.48.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 16686
+          name: query
+          protocol: TCP
+        - containerPort: 14268
+          name: collector
+          protocol: TCP
+        - containerPort: 14250
+          name: grpc
+          protocol: TCP
+        - containerPort: 6831
+          name: agent-compact
+          protocol: UDP
+        - containerPort: 6832
+          name: agent-binary
+          protocol: UDP
+        - containerPort: 14269
+          name: admin
+          protocol: TCP
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: SPAN_STORAGE_TYPE
+          value: "elasticsearch"
+        - name: ES_SERVER_URLS
+          value: "http://elasticsearch.mcp-monitoring.svc.cluster.local:9200"
+        - name: ES_USERNAME
+          value: "elastic"
+        - name: ES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Elasticsearch Cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: mcp-monitoring
+  labels:
+    app: elasticsearch
+    component: logging
+    version: v8.9.0
+spec:
+  serviceName: elasticsearch
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        component: logging
+        version: v8.9.0
+    spec:
+      serviceAccountName: elasticsearch
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+      - name: increase-vm-max-map
+        image: busybox:1.36.1
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        env:
+        - name: cluster.name
+          value: "mcp-logging"
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: discovery.seed_hosts
+          value: "elasticsearch-0.elasticsearch,elasticsearch-1.elasticsearch,elasticsearch-2.elasticsearch"
+        - name: cluster.initial_master_nodes
+          value: "elasticsearch-0,elasticsearch-1,elasticsearch-2"
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: xpack.security.enabled
+          value: "true"
+        - name: xpack.security.transport.ssl.enabled
+          value: "true"
+        - name: xpack.security.transport.ssl.verification_mode
+          value: "certificate"
+        - name: xpack.security.transport.ssl.keystore.path
+          value: "/usr/share/elasticsearch/config/certs/elastic-certificates.p12"
+        - name: xpack.security.transport.ssl.truststore.path
+          value: "/usr/share/elasticsearch/config/certs/elastic-certificates.p12"
+        - name: xpack.security.http.ssl.enabled
+          value: "true"
+        - name: xpack.security.http.ssl.keystore.path
+          value: "/usr/share/elasticsearch/config/certs/elastic-certificates.p12"
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTPS
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+        - name: certs
+          mountPath: /usr/share/elasticsearch/config/certs
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          secretName: elasticsearch-certs
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: ssd-storage
+
+---
+# Kibana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: mcp-monitoring
+  labels:
+    app: kibana
+    component: logging
+    version: v8.9.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+        component: logging
+        version: v8.9.0
+    spec:
+      serviceAccountName: kibana
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.9.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5601
+          name: http
+          protocol: TCP
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "https://elasticsearch.mcp-monitoring.svc.cluster.local:9200"
+        - name: ELASTICSEARCH_USERNAME
+          value: "elastic"
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: password
+        - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
+          value: "/usr/share/kibana/config/certs/ca.crt"
+        - name: SERVER_SSL_ENABLED
+          value: "true"
+        - name: SERVER_SSL_CERTIFICATE
+          value: "/usr/share/kibana/config/certs/kibana.crt"
+        - name: SERVER_SSL_KEY
+          value: "/usr/share/kibana/config/certs/kibana.key"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+            scheme: HTTPS
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/kibana/config
+        - name: certs
+          mountPath: /usr/share/kibana/config/certs
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: kibana-config
+      - name: certs
+        secret:
+          secretName: kibana-certs
+
+---
+# Fluent Bit DaemonSet for Log Collection
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: mcp-monitoring
+  labels:
+    app: fluent-bit
+    component: logging
+    version: v2.1.8
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+        component: logging
+        version: v2.1.8
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2020"
+        prometheus.io/path: "/api/v1/metrics/prometheus"
+    spec:
+      serviceAccountName: fluent-bit
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:2.1.8
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 2020
+          name: http
+          protocol: TCP
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch.mcp-monitoring.svc.cluster.local"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        - name: FLUENT_ELASTICSEARCH_USER
+          value: "elastic"
+        - name: FLUENT_ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 2020
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 2020
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /fluent-bit/etc
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: runlogjournal
+          mountPath: /run/log/journal
+          readOnly: true
+        - name: dmesg
+          mountPath: /dev/kmsg
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: fluent-bit-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: runlogjournal
+        hostPath:
+          path: /run/log/journal
+      - name: dmesg
+        hostPath:
+          path: /dev/kmsg
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+
+---
+# AlertManager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: mcp-monitoring
+  labels:
+    app: alertmanager
+    component: alerting
+    version: v0.25.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+        component: alerting
+        version: v0.25.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: alertmanager
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.25.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9093
+          name: web
+          protocol: TCP
+        args:
+        - "--config.file=/etc/alertmanager/alertmanager.yml"
+        - "--storage.path=/alertmanager"
+        - "--web.external-url=https://alertmanager.mcp-security-platform.local"
+        - "--cluster.listen-address="
+        - "--log.level=info"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 4
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        - name: storage
+          mountPath: /alertmanager
+      volumes:
+      - name: config
+        configMap:
+          name: alertmanager-config
+      - name: storage
+        persistentVolumeClaim:
+          claimName: alertmanager-storage
+
+---
+# Services for Monitoring Components
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: mcp-monitoring
+  labels:
+    app: prometheus
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: web
+  selector:
+    app: prometheus
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: mcp-monitoring
+  labels:
+    app: grafana
+    component: visualization
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: grafana
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: mcp-monitoring
+  labels:
+    app: jaeger
+    component: tracing
+spec:
+  type: ClusterIP
+  ports:
+  - port: 16686
+    targetPort: 16686
+    protocol: TCP
+    name: query
+  selector:
+    app: jaeger
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: mcp-monitoring
+  labels:
+    app: jaeger
+    component: tracing
+spec:
+  type: ClusterIP
+  ports:
+  - port: 14268
+    targetPort: 14268
+    protocol: TCP
+    name: collector
+  - port: 14250
+    targetPort: 14250
+    protocol: TCP
+    name: grpc
+  - port: 6831
+    targetPort: 6831
+    protocol: UDP
+    name: agent-compact
+  - port: 6832
+    targetPort: 6832
+    protocol: UDP
+    name: agent-binary
+  selector:
+    app: jaeger
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: mcp-monitoring
+  labels:
+    app: elasticsearch
+    component: logging
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9200
+    targetPort: 9200
+    protocol: TCP
+    name: http
+  - port: 9300
+    targetPort: 9300
+    protocol: TCP
+    name: transport
+  selector:
+    app: elasticsearch
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: mcp-monitoring
+  labels:
+    app: kibana
+    component: logging
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5601
+    targetPort: 5601
+    protocol: TCP
+    name: http
+  selector:
+    app: kibana
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: mcp-monitoring
+  labels:
+    app: alertmanager
+    component: alerting
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9093
+    targetPort: 9093
+    protocol: TCP
+    name: web
+  selector:
+    app: alertmanager
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage
+  namespace: mcp-monitoring
+  labels:
+    app: prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: ssd-storage
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: mcp-monitoring
+  labels:
+    app: grafana
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: ssd-storage
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-storage
+  namespace: mcp-monitoring
+  labels:
+    app: alertmanager
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: ssd-storage
+
+---
+# Ingress for External Access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: mcp-monitoring
+  labels:
+    app: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - grafana.mcp-security-platform.local
+    - prometheus.mcp-security-platform.local
+    - jaeger.mcp-security-platform.local
+    - kibana.mcp-security-platform.local
+    - alertmanager.mcp-security-platform.local
+    secretName: monitoring-tls
+  rules:
+  - host: grafana.mcp-security-platform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  - host: prometheus.mcp-security-platform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  - host: jaeger.mcp-security-platform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger-query
+            port:
+              number: 16686
+  - host: kibana.mcp-security-platform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: 5601
+  - host: alertmanager.mcp-security-platform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093

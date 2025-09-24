@@ -1,0 +1,15 @@
+{{- if .Values.namespaceOverride }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaceOverride }}
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+    {{- include "mcp-platform.podSecurityStandards" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    {{- if eq (include "mcp-platform.isOpenShift" .) "true" }}
+    openshift.io/display-name: "MCP Security Platform"
+    openshift.io/description: "Comprehensive security assessment platform namespace"
+    {{- end }}
+{{- end }}

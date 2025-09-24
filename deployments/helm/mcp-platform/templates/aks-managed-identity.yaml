@@ -1,0 +1,42 @@
+{{- if and (eq (include "mcp-platform.isAKS" .) "true") .Values.kubernetesFlavorConfig.aks.managedIdentity.enabled -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mcp-platform.serviceAccountName" . }}-mi
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    # Azure Managed Identity annotations
+    {{- if .Values.kubernetesFlavorConfig.aks.managedIdentity.clientId }}
+    azure.workload.identity/client-id: {{ .Values.kubernetesFlavorConfig.aks.managedIdentity.clientId | quote }}
+    {{- end }}
+    {{- if .Values.kubernetesFlavorConfig.aks.managedIdentity.tenantId }}
+    azure.workload.identity/tenant-id: {{ .Values.kubernetesFlavorConfig.aks.managedIdentity.tenantId | quote }}
+    {{- end }}
+    azure.workload.identity/use: "true"
+automountServiceAccountToken: true
+---
+{{- if .Values.kubernetesFlavorConfig.aks.managedIdentity.clientId }}
+apiVersion: azure.microsoft.com/v1
+kind: AzureIdentity
+metadata:
+  name: {{ include "mcp-platform.fullname" . }}-identity
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+spec:
+  type: 0  # Managed Identity
+  resourceID: /subscriptions/{{ .Values.kubernetesFlavorConfig.aks.managedIdentity.subscriptionId | default "YOUR_SUBSCRIPTION_ID" }}/resourceGroups/{{ .Values.kubernetesFlavorConfig.aks.managedIdentity.resourceGroup | default "YOUR_RESOURCE_GROUP" }}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{{ include "mcp-platform.fullname" . }}-identity
+  clientID: {{ .Values.kubernetesFlavorConfig.aks.managedIdentity.clientId }}
+---
+apiVersion: azure.microsoft.com/v1
+kind: AzureIdentityBinding
+metadata:
+  name: {{ include "mcp-platform.fullname" . }}-identity-binding
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+spec:
+  azureIdentity: {{ include "mcp-platform.fullname" . }}-identity
+  selector: {{ include "mcp-platform.fullname" . }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,905 @@
+# Production Deployment for MCP Plugin System
+
+---
+# Plugin Registry Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plugin-registry
+  namespace: mcp-plugins
+  labels:
+    app: plugin-registry
+    component: plugin-system
+    version: v2.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: plugin-registry
+  template:
+    metadata:
+      labels:
+        app: plugin-registry
+        component: plugin-system
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: plugin-registry
+        image: mcp-platform/plugin-registry:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: postgresql-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: redis-url
+        - name: PLUGIN_REGISTRY_STORAGE
+          value: "minio"
+        - name: MINIO_ENDPOINT
+          value: "minio.mcp-data.svc.cluster.local:9000"
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: access-key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: secret-key
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: plugin-cache
+          mountPath: /app/plugins
+      volumes:
+      - name: config
+        configMap:
+          name: plugin-registry-config
+      - name: plugin-cache
+        persistentVolumeClaim:
+          claimName: plugin-cache-pvc
+
+---
+# Scanner Plugin Deployments
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivy-plugin
+  namespace: mcp-plugins
+  labels:
+    app: trivy-plugin
+    component: scanner
+    version: v2.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: trivy-plugin
+  template:
+    metadata:
+      labels:
+        app: trivy-plugin
+        component: scanner
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: trivy-plugin
+        image: mcp-platform/trivy-plugin:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PLUGIN_TYPE
+          value: "scanner"
+        - name: PLUGIN_ID
+          value: "trivy"
+        - name: REGISTRY_URL
+          value: "http://plugin-registry.mcp-plugins.svc.cluster.local:8080"
+        - name: TRIVY_CACHE_DIR
+          value: "/app/cache"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: cache
+          mountPath: /app/cache
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+          claimName: trivy-cache-pvc
+      - name: config
+        configMap:
+          name: trivy-plugin-config
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: syft-plugin
+  namespace: mcp-plugins
+  labels:
+    app: syft-plugin
+    component: scanner
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: syft-plugin
+  template:
+    metadata:
+      labels:
+        app: syft-plugin
+        component: scanner
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: syft-plugin
+        image: mcp-platform/syft-plugin:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PLUGIN_TYPE
+          value: "scanner"
+        - name: PLUGIN_ID
+          value: "syft"
+        - name: REGISTRY_URL
+          value: "http://plugin-registry.mcp-plugins.svc.cluster.local:8080"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: syft-plugin-config
+
+---
+# Integration Plugin Deployments
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-plugin
+  namespace: mcp-plugins
+  labels:
+    app: github-plugin
+    component: integration
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: github-plugin
+  template:
+    metadata:
+      labels:
+        app: github-plugin
+        component: integration
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: github-plugin
+        image: mcp-platform/github-plugin:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: webhook
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PLUGIN_TYPE
+          value: "integration"
+        - name: PLUGIN_ID
+          value: "github"
+        - name: REGISTRY_URL
+          value: "http://plugin-registry.mcp-plugins.svc.cluster.local:8080"
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: token
+        - name: GITHUB_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: webhook-secret
+        resources:
+          requests:
+            cpu: 300m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: webhooks-tls
+          mountPath: /app/certs
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: github-plugin-config
+      - name: webhooks-tls
+        secret:
+          secretName: webhooks-tls
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slack-plugin
+  namespace: mcp-plugins
+  labels:
+    app: slack-plugin
+    component: integration
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: slack-plugin
+  template:
+    metadata:
+      labels:
+        app: slack-plugin
+        component: integration
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: slack-plugin
+        image: mcp-platform/slack-plugin:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PLUGIN_TYPE
+          value: "alert"
+        - name: PLUGIN_ID
+          value: "slack"
+        - name: REGISTRY_URL
+          value: "http://plugin-registry.mcp-plugins.svc.cluster.local:8080"
+        - name: SLACK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: slack-credentials
+              key: token
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: slack-credentials
+              key: webhook-url
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: slack-plugin-config
+
+---
+# Compliance Plugin Deployments
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nist-plugin
+  namespace: mcp-plugins
+  labels:
+    app: nist-plugin
+    component: compliance
+    version: v2.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: nist-plugin
+  template:
+    metadata:
+      labels:
+        app: nist-plugin
+        component: compliance
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mcp-plugin-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: nist-plugin
+        image: mcp-platform/nist-plugin:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PLUGIN_TYPE
+          value: "compliance"
+        - name: PLUGIN_ID
+          value: "nist"
+        - name: REGISTRY_URL
+          value: "http://plugin-registry.mcp-plugins.svc.cluster.local:8080"
+        - name: NIST_FRAMEWORK_VERSION
+          value: "1.1"
+        resources:
+          requests:
+            cpu: 300m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: frameworks
+          mountPath: /app/frameworks
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: nist-plugin-config
+      - name: frameworks
+        configMap:
+          name: compliance-frameworks
+
+---
+# Services for Plugin Components
+apiVersion: v1
+kind: Service
+metadata:
+  name: plugin-registry
+  namespace: mcp-plugins
+  labels:
+    app: plugin-registry
+    component: plugin-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: plugin-registry
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trivy-plugin
+  namespace: mcp-plugins
+  labels:
+    app: trivy-plugin
+    component: scanner
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: trivy-plugin
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: syft-plugin
+  namespace: mcp-plugins
+  labels:
+    app: syft-plugin
+    component: scanner
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: syft-plugin
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-plugin
+  namespace: mcp-plugins
+  labels:
+    app: github-plugin
+    component: integration
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 8443
+    targetPort: 8443
+    protocol: TCP
+    name: webhook
+  selector:
+    app: github-plugin
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slack-plugin
+  namespace: mcp-plugins
+  labels:
+    app: slack-plugin
+    component: integration
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: slack-plugin
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nist-plugin
+  namespace: mcp-plugins
+  labels:
+    app: nist-plugin
+    component: compliance
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: nist-plugin
+
+---
+# Persistent Volume Claims for Plugin Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plugin-cache-pvc
+  namespace: mcp-plugins
+  labels:
+    app: plugin-registry
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: ssd-storage
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trivy-cache-pvc
+  namespace: mcp-plugins
+  labels:
+    app: trivy-plugin
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: ssd-storage
+
+---
+# Horizontal Pod Autoscalers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: plugin-registry-hpa
+  namespace: mcp-plugins
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: plugin-registry
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trivy-plugin-hpa
+  namespace: mcp-plugins
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trivy-plugin
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: plugin-system
+  namespace: mcp-plugins
+  labels:
+    app: plugin-system
+spec:
+  selector:
+    matchLabels:
+      component: plugin-system
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# Network Policies for Plugin Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: plugin-registry-policy
+  namespace: mcp-plugins
+spec:
+  podSelector:
+    matchLabels:
+      app: plugin-registry
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security-platform
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-plugins
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-data
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scanner-plugins-policy
+  namespace: mcp-plugins
+spec:
+  podSelector:
+    matchLabels:
+      component: scanner
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: mcp-security-platform
+    - podSelector:
+        matchLabels:
+          app: plugin-registry
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: plugin-registry
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: UDP
+      port: 53

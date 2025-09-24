@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-zero-trust-service
+  namespace: fortress-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-zero-trust-service
+  template:
+    metadata:
+      labels:
+        app: fortress-zero-trust-service
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: zero-trust-service
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8091
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: zero-trust-code
+          mountPath: /app
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          cd /app
+          pip install fastapi uvicorn pydantic cryptography
+          python main.py
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: zero-trust-code
+        configMap:
+          name: fortress-zero-trust-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-zero-trust-service
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-zero-trust-service
+  ports:
+  - port: 8091
+    targetPort: 8091
+  type: ClusterIP

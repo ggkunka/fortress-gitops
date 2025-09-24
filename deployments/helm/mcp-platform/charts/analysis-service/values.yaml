@@ -1,0 +1,74 @@
+# Default values for analysis-service
+
+replicaCount: 2
+
+image:
+  repository: "mcp-security/analysis-service"
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8083
+  targetPort: 8083
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+healthcheck:
+  enabled: true
+  livenessProbe:
+    path: "/health/live"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  readinessProbe:
+    path: "/health/ready"
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+env:
+  ANALYSIS_HOST: "0.0.0.0"
+  ANALYSIS_PORT: "8083"
+  LOG_LEVEL: "info"
+  REDIS_URL: "redis://mcp-platform-redis-master:6379/2"
+  MITRE_ATTACK_API: "https://attack.mitre.org/api"
+  THREAT_ANALYSIS_CACHE_TTL: "1800"
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsNonRoot: true
+  runAsUser: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001

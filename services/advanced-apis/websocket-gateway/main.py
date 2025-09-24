@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""
+WebSocket Gateway Service - Phase 4.2
+Real-time Communication Server
+"""
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+import asyncio
+import json
+from datetime import datetime
+from typing import Dict, List
+import uvicorn
+
+app = FastAPI(title="Fortress WebSocket Gateway", version="1.0.0")
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket, channel: str):
+        await websocket.accept()
+        if channel not in self.active_connections:
+            self.active_connections[channel] = []
+        self.active_connections[channel].append(websocket)
+    
+    def disconnect(self, websocket: WebSocket, channel: str):
+        if channel in self.active_connections:
+            self.active_connections[channel].remove(websocket)
+    
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+    
+    async def broadcast(self, message: str, channel: str):
+        if channel in self.active_connections:
+            for connection in self.active_connections[channel]:
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/{channel}")
+async def websocket_endpoint(websocket: WebSocket, channel: str):
+    await manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = {
+                "channel": channel,
+                "data": json.loads(data),
+                "timestamp": datetime.now().isoformat()
+            }
+            await manager.broadcast(json.dumps(message), channel)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, channel)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "websocket-gateway"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8088)

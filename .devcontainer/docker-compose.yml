@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # Main development container
+  devcontainer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspace:cached
+      - mcp-vscode-extensions:/home/vscode/.vscode-server/extensions
+      - mcp-vscode-extensions-insiders:/home/vscode/.vscode-server-insiders/extensions
+    # Overrides default command so things don't shut down after the process ends
+    command: sleep infinity
+    networks:
+      - mcp-network
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      - DATABASE_URL=postgresql://mcp_user:mcp_password@postgres:5432/mcp_security
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minio_access_key
+      - MINIO_SECRET_KEY=minio_secret_key
+
+  # PostgreSQL for development
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mcp_user
+      POSTGRES_PASSWORD: mcp_password
+      POSTGRES_DB: mcp_security
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp_user -d mcp_security"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and events
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis-data:/data
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO for S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Simple web UI for the POC
+  mcp-ui:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - mcp-network
+    depends_on:
+      - devcontainer
+
+volumes:
+  mcp-vscode-extensions:
+  mcp-vscode-extensions-insiders:
+  postgres-data:
+  redis-data:
+  minio-data:
+
+networks:
+  mcp-network:
+    driver: bridge

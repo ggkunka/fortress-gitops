@@ -1,0 +1,109 @@
+# Fortress Scan Orchestrator Deployment
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-scan-orchestrator
+  template:
+    metadata:
+      labels:
+        app: fortress-scan-orchestrator
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: fortress-orchestrator
+      containers:
+      - name: orchestrator
+        image: python:3.11-slim
+        workingDir: /app
+        command: ["python", "-m", "uvicorn", "fortress_orchestrator_api:app", "--host", "0.0.0.0", "--port", "8002"]
+        ports:
+        - containerPort: 8002
+        env:
+        - name: FORTRESS_NAMESPACE
+          value: "fortress-system"
+        - name: HARBOR_REGISTRY
+          value: "10.63.89.182:30500"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus:9090"
+        volumeMounts:
+        - name: orchestrator-code
+          mountPath: /app
+        - name: kubeconfig
+          mountPath: /root/.kube
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"  
+            cpu: "500m"
+      volumes:
+      - name: orchestrator-code
+        configMap:
+          name: orchestrator-code
+      - name: kubeconfig
+        secret:
+          secretName: fortress-kubeconfig
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-scan-orchestrator
+  ports:
+  - name: api
+    port: 8002
+    targetPort: 8002
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-orchestrator
+  namespace: fortress-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-orchestrator
+rules:
+- apiGroups: [""]
+  resources: ["pods", "namespaces", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-orchestrator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fortress-orchestrator
+subjects:
+- kind: ServiceAccount
+  name: fortress-orchestrator
+  namespace: fortress-system

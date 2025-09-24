@@ -1,0 +1,108 @@
+{
+  "name": "sample-analyzer",
+  "version": "1.0.0",
+  "description": "Sample vulnerability analyzer plugin demonstrating custom scanning capabilities",
+  "author": "MCP Security Platform Team",
+  "email": "platform@mcp-security.com",
+  "license": "Apache-2.0",
+  "plugin_type": "analyzer",
+  "capabilities": {
+    "event_types": [
+      "analysis.requested",
+      "vulnerability.detected"
+    ],
+    "supported_formats": [
+      "source_code",
+      "config_file",
+      "log_file"
+    ],
+    "required_permissions": [
+      "file_system_access",
+      "network_access"
+    ],
+    "cpu_intensive": true,
+    "memory_intensive": false,
+    "network_access": true,
+    "file_system_access": true,
+    "database_access": false
+  },
+  "sdk_version": ">=1.0.0",
+  "python_version": ">=3.9",
+  "dependencies": [
+    "aiofiles>=23.0.0",
+    "regex>=2023.0.0",
+    "pyyaml>=6.0.0"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "scan_patterns": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Regular expression patterns for vulnerability detection"
+      },
+      "severity_mapping": {
+        "type": "object",
+        "description": "Mapping of pattern names to severity levels"
+      },
+      "max_file_size_mb": {
+        "type": "integer",
+        "default": 10,
+        "description": "Maximum file size to analyze in MB"
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "default": 300,
+        "description": "Analysis timeout in seconds"
+      },
+      "enable_ai_analysis": {
+        "type": "boolean",
+        "default": false,
+        "description": "Enable AI-powered vulnerability analysis"
+      }
+    },
+    "required": ["scan_patterns"]
+  },
+  "default_config": {
+    "scan_patterns": [
+      "(?i)(password|passwd|pwd)\\s*[=:]\\s*[\"'][^\"']{1,50}[\"']",
+      "(?i)(api_key|apikey|api-key)\\s*[=:]\\s*[\"'][^\"']{10,}[\"']",
+      "(?i)(secret|token)\\s*[=:]\\s*[\"'][^\"']{8,}[\"']",
+      "(?i)eval\\s*\\(",
+      "(?i)exec\\s*\\(",
+      "(?i)system\\s*\\(",
+      "(?i)shell_exec\\s*\\(",
+      "(?i)passthru\\s*\\(",
+      "(?i)<script[^>]*>.*?</script>",
+      "(?i)union\\s+select",
+      "(?i)drop\\s+table",
+      "(?i)delete\\s+from"
+    ],
+    "severity_mapping": {
+      "password": "high",
+      "api_key": "high", 
+      "secret": "high",
+      "eval": "critical",
+      "exec": "critical",
+      "system": "critical",
+      "script": "medium",
+      "union": "high",
+      "drop": "critical",
+      "delete": "medium"
+    },
+    "max_file_size_mb": 10,
+    "timeout_seconds": 300,
+    "enable_ai_analysis": false
+  },
+  "entry_point": "src.analyzer:SampleAnalyzerPlugin",
+  "priority": 50,
+  "enabled": true,
+  "tags": [
+    "vulnerability",
+    "static-analysis", 
+    "pattern-matching",
+    "sample"
+  ],
+  "documentation_url": "https://docs.mcp-security.com/plugins/sample-analyzer",
+  "source_url": "https://github.com/mcp-security/platform/tree/main/plugins/sample-analyzer"
+}

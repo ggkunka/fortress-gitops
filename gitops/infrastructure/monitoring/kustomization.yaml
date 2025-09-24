@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: monitoring-stack
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security-monitoring
+
+resources:
+- namespace.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/name: monitoring-stack
+    app.kubernetes.io/part-of: mcp-security-platform
+    app.kubernetes.io/managed-by: argocd

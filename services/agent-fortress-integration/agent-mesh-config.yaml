@@ -1,0 +1,83 @@
+# Fortress-Agent Secure Communication via Istio
+
+# ServiceEntry for external agent clusters
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: fortress-agents
+  namespace: fortress-system
+spec:
+  hosts:
+  - agent.target-cluster.local
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  - number: 8080
+    name: http
+    protocol: HTTP
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# DestinationRule for agent communication
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-agent-communication
+  namespace: fortress-system
+spec:
+  host: agent.target-cluster.local
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 10
+        maxRequestsPerConnection: 5
+
+---
+# VirtualService for agent API routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fortress-agent-routing
+  namespace: fortress-system
+spec:
+  hosts:
+  - agent.target-cluster.local
+  http:
+  - match:
+    - uri:
+        prefix: /agent/scan/
+    route:
+    - destination:
+        host: agent.target-cluster.local
+        port:
+          number: 8080
+    timeout: 300s
+    retries:
+      attempts: 3
+      perTryTimeout: 60s
+
+---
+# Egress Gateway for secure agent communication
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fortress-agent-egress
+  namespace: fortress-system
+spec:
+  selector:
+    istio: egressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - agent.target-cluster.local
+    tls:
+      mode: PASSTHROUGH

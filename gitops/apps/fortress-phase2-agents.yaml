@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fortress-phase2-agents
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: fortress-phase2-agents
+    fortress.io/phase: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/platform/fortress-phase2-agents
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fortress-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+  revisionHistoryLimit: 10

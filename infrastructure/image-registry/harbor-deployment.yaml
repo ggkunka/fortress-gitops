@@ -1,0 +1,201 @@
+# Harbor Registry for Air-Gapped Image Mirroring - Complete Architecture
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor-system
+  labels:
+    name: harbor-system
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-registry-data
+  namespace: harbor-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-database-data
+  namespace: harbor-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-path
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbor-registry
+  namespace: harbor-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harbor-registry
+  template:
+    metadata:
+      labels:
+        app: harbor-registry
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: harbor-core
+        image: goharbor/harbor-core:v2.9.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CORE_SECRET
+          value: "fortress-harbor-secret"
+        - name: JOBSERVICE_SECRET
+          value: "fortress-jobservice-secret"
+        - name: DATABASE_TYPE
+          value: "postgresql"
+        - name: POSTGRESQL_HOST
+          value: "localhost"
+        - name: POSTGRESQL_PORT
+          value: "5432"
+        - name: POSTGRESQL_USERNAME
+          value: "postgres"
+        - name: POSTGRESQL_PASSWORD
+          value: "fortress123"
+        - name: POSTGRESQL_DATABASE
+          value: "registry"
+        - name: REGISTRY_URL
+          value: "http://localhost:5000"
+        volumeMounts:
+        - name: harbor-config
+          mountPath: /etc/core/app.conf
+          subPath: app.conf
+        - name: registry-data
+          mountPath: /storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      - name: harbor-registry
+        image: goharbor/registry-photon:v2.9.0
+        ports:
+        - containerPort: 5000
+        env:
+        - name: REGISTRY_HTTP_SECRET
+          value: "fortress-registry-secret"
+        - name: REGISTRY_LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: registry-data
+          mountPath: /storage
+        - name: registry-config
+          mountPath: /etc/registry/config.yml
+          subPath: config.yml
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      - name: harbor-db
+        image: goharbor/harbor-db:v2.9.0
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "fortress123"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "registry"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: database-data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: registry-data
+        persistentVolumeClaim:
+          claimName: harbor-registry-data
+      - name: database-data
+        persistentVolumeClaim:
+          claimName: harbor-database-data
+      - name: harbor-config
+        configMap:
+          name: harbor-config
+      - name: registry-config
+        configMap:
+          name: registry-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-registry
+  namespace: harbor-system
+spec:
+  selector:
+    app: harbor-registry
+  ports:
+  - name: web
+    port: 80
+    targetPort: 8080
+    nodePort: 30443  # HTTPS Harbor UI
+  - name: registry
+    port: 5000
+    targetPort: 5000
+    nodePort: 30500  # Docker Registry API
+  type: NodePort
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-config
+  namespace: harbor-system
+data:
+  app.conf: |
+    appname = Harbor
+    runmode = prod
+    [prod]
+    httpport = 8080
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: harbor-system
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+    storage:
+      filesystem:
+        rootdirectory: /storage
+    http:
+      addr: :5000

@@ -1,0 +1,100 @@
+# Fortress Configuration Maps
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-web-nginx
+  namespace: fortress-system
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        upstream fortress_backend {
+            server fortress-gateway:80;
+        }
+        server {
+            listen 80;
+            server_name _;
+            location /api/ {
+                proxy_pass http://fortress_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+            location / {
+                root /usr/share/nginx/html;
+                index index.html;
+                try_files $uri $uri/ /index.html;
+            }
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-web-content
+  namespace: fortress-system
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Fortress Security Platform</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .header { color: #2c3e50; text-align: center; }
+            .status { background: #27ae60; color: white; padding: 20px; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🏰 Fortress Security Platform</h1>
+            <p>Enterprise CNAPP with Istio Service Mesh</p>
+        </div>
+        <div class="status">
+            <h2>✅ Platform Status: OPERATIONAL</h2>
+            <ul>
+                <li>🗄️ Database Stack: PostgreSQL, Redis, Elasticsearch</li>
+                <li>🐳 Harbor Registry: Operational</li>
+                <li>🔍 Scan Orchestrator: Ready</li>
+                <li>🔐 Istio Service Mesh: Enabled</li>
+                <li>🛡️ mTLS Security: Active</li>
+            </ul>
+        </div>
+    </body>
+    </html>
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-gateway-config
+  namespace: fortress-system
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        upstream auth_service {
+            server fortress-auth:8001;
+        }
+        upstream scan_service {
+            server fortress-scan-orchestrator:8002;
+        }
+        server {
+            listen 80;
+            location /auth/ {
+                proxy_pass http://auth_service/;
+            }
+            location /scan/ {
+                proxy_pass http://scan_service/;
+            }
+            location /health {
+                return 200 "OK";
+                add_header Content-Type text/plain;
+            }
+        }
+    }

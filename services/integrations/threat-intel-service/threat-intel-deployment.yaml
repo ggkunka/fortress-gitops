@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-threat-intel-service
+  namespace: fortress-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-threat-intel-service
+  template:
+    metadata:
+      labels:
+        app: fortress-threat-intel-service
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: threat-intel-service
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8092
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: threat-intel-code
+          mountPath: /app
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          cd /app
+          pip install fastapi uvicorn aiohttp pydantic
+          python main.py
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8092
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8092
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: threat-intel-code
+        configMap:
+          name: fortress-threat-intel-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-threat-intel-service
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-threat-intel-service
+  ports:
+  - port: 8092
+    targetPort: 8092
+  type: ClusterIP

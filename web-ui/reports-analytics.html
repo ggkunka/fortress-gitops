@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Fortress Reports & Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%); color: #ffffff; min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .kpi-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 2rem; text-align: center; position: relative; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+        .kpi-security::before { background: linear-gradient(90deg, #10b981, #059669); }
+        .kpi-threats::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .kpi-compliance::before { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
+        .kpi-vulnerabilities::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .kpi-value { font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .kpi-trend { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.9rem; }
+        .trend-up { color: #10b981; }
+        .trend-down { color: #ef4444; }
+        .btn { background: linear-gradient(135deg, #00d4ff, #7c3aed); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+        .report-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; }
+        .report-icon { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem; }
+        .report-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .report-description { font-size: 0.9rem; opacity: 0.8; margin-bottom: 1.5rem; line-height: 1.5; }
+        .report-meta { display: flex; justify-content: space-between; align-items: center; margin: 1rem 0; font-size: 0.8rem; opacity: 0.7; }
+        .report-actions { display: flex; gap: 0.5rem; }
+        .report-actions .btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+        .chart-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; }
+        .chart-container { position: relative; height: 400px; }
+        .data-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .data-table th, .data-table td { text-align: left; padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .data-table th { background: rgba(255, 255, 255, 0.05); font-weight: 600; }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .status-active { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-scheduled { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> Reports & Analytics</h1>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="generateReport()">
+                    <i class="fas fa-plus"></i> Generate Report
+                </button>
+                <button class="btn btn-secondary" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Dashboard -->
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-security">
+                <div class="kpi-value" style="color: #10b981;">98.7%</div>
+                <div style="font-size: 1rem; opacity: 0.8; margin-bottom: 0.5rem;">Security Score</div>
+                <div class="kpi-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> +2.3% from last month
+                </div>
+            </div>
+            <div class="kpi-card kpi-threats">
+                <div class="kpi-value" style="color: #00d4ff;">1,247</div>
+                <div style="font-size: 1rem; opacity: 0.8; margin-bottom: 0.5rem;">Threats Blocked</div>
+                <div class="kpi-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> +156 this month
+                </div>
+            </div>
+            <div class="kpi-card kpi-compliance">
+                <div class="kpi-value" style="color: #3b82f6;">87.4%</div>
+                <div style="font-size: 1rem; opacity: 0.8; margin-bottom: 0.5rem;">Compliance Rate</div>
+                <div class="kpi-trend" style="color: #f59e0b;">
+                    <i class="fas fa-minus"></i> Stable
+                </div>
+            </div>
+            <div class="kpi-card kpi-vulnerabilities">
+                <div class="kpi-value" style="color: #f59e0b;">23</div>
+                <div style="font-size: 1rem; opacity: 0.8; margin-bottom: 0.5rem;">Critical CVEs</div>
+                <div class="kpi-trend trend-down">
+                    <i class="fas fa-arrow-down"></i> -12 patched
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div style="font-size: 1.3rem; font-weight: 700;">Security Posture Trends</div>
+                    <button class="btn btn-secondary" onclick="exportChart('security')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="securityChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div style="font-size: 1.3rem; font-weight: 700;">Threat Analytics</div>
+                    <button class="btn btn-secondary" onclick="exportChart('threats')" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="threatsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Reports -->
+        <div style="margin-bottom: 3rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div style="font-size: 1.5rem; font-weight: 700;">Available Reports</div>
+                <button class="btn" onclick="refreshReports()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="reports-grid">
+                <div class="report-card">
+                    <div class="report-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="report-title">Executive Security Summary</div>
+                    <div class="report-description">
+                        Comprehensive executive-level security posture report with key metrics and strategic recommendations.
+                    </div>
+                    <div class="report-meta">
+                        <span>Last Generated: 2 hours ago</span>
+                        <span>Size: 2.4 MB</span>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-secondary" onclick="viewReport('executive')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-success" onclick="downloadReport('executive')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <div class="report-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                        <i class="fas fa-bug"></i>
+                    </div>
+                    <div class="report-title">Vulnerability Assessment</div>
+                    <div class="report-description">
+                        Detailed vulnerability analysis with CVE tracking, CVSS scoring, and remediation recommendations.
+                    </div>
+                    <div class="report-meta">
+                        <span>Last Generated: 4 hours ago</span>
+                        <span>Size: 5.7 MB</span>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-secondary" onclick="viewReport('vulnerability')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-success" onclick="downloadReport('vulnerability')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <div class="report-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div class="report-title">Compliance Audit Report</div>
+                    <div class="report-description">
+                        Multi-framework compliance status with SOC 2, PCI DSS, GDPR, HIPAA, and ISO 27001 assessments.
+                    </div>
+                    <div class="report-meta">
+                        <span>Last Generated: 1 day ago</span>
+                        <span>Size: 8.2 MB</span>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-secondary" onclick="viewReport('compliance')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-success" onclick="downloadReport('compliance')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <div class="report-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="report-title">Threat Intelligence Report</div>
+                    <div class="report-description">
+                        AI-powered threat analysis with behavioral analytics, attack patterns, and predictive insights.
+                    </div>
+                    <div class="report-meta">
+                        <span>Last Generated: 6 hours ago</span>
+                        <span>Size: 3.1 MB</span>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-secondary" onclick="viewReport('threat-intel')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-success" onclick="downloadReport('threat-intel')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduled Reports -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div style="font-size: 1.5rem; font-weight: 700;">Scheduled Reports</div>
+                <button class="btn" onclick="addSchedule()">
+                    <i class="fas fa-plus"></i> Add Schedule
+                </button>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Report Name</th>
+                        <th>Frequency</th>
+                        <th>Recipients</th>
+                        <th>Next Run</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Executive Security Summary</td>
+                        <td>Weekly</td>
+                        <td>CEO, CISO, Security Team</td>
+                        <td>Dec 23, 2024 09:00</td>
+                        <td><span class="status-badge status-active">Active</span></td>
+                        <td>
+                            <button class="btn btn-secondary" onclick="editSchedule('exec')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Compliance Audit Report</td>
+                        <td>Monthly</td>
+                        <td>Compliance Team, Auditors</td>
+                        <td>Jan 1, 2025 08:00</td>
+                        <td><span class="status-badge status-scheduled">Scheduled</span></td>
+                        <td>
+                            <button class="btn btn-secondary" onclick="editSchedule('compliance')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Vulnerability Assessment</td>
+                        <td>Daily</td>
+                        <td>Security Operations Team</td>
+                        <td>Dec 21, 2024 06:00</td>
+                        <td><span class="status-badge status-active">Active</span></td>
+                        <td>
+                            <button class="btn btn-secondary" onclick="editSchedule('vuln')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function generateReport() {
+            alert('📊 Generate Custom Report\n\nCreate tailored reports:\n• Select data sources\n• Choose visualization types\n• Configure parameters\n• Set output format\n• Schedule delivery\n\nReport builder would open here.');
+        }
+
+        function exportData() {
+            alert('📁 Export Data\n\nAvailable formats:\n• PDF Report\n• Excel Spreadsheet\n• CSV Data\n• JSON API Format\n\nSelect format and download options.');
+        }
+
+        function exportChart(type) {
+            alert(`📈 Export ${type} Chart\n\nExporting chart data:\n• High-resolution image\n• Raw data CSV\n• Interactive HTML\n\nMultiple formats available.`);
+        }
+
+        function viewReport(type) {
+            alert(`📋 View ${type} Report\n\nOpening report viewer:\n• Interactive dashboard\n• Drill-down capabilities\n• Real-time data\n• Export options\n\nReport interface would open here.`);
+        }
+
+        function downloadReport(type) {
+            alert(`⬇️ Download ${type} Report\n\nPreparing download:\n• Generating PDF\n• Including charts and data\n• Applying branding\n• Optimizing file size\n\nDownload will start shortly.`);
+        }
+
+        function refreshReports() {
+            alert('🔄 Refreshing Reports\n\nUpdating all reports:\n• Fetching latest data\n• Regenerating analytics\n• Updating timestamps\n• Validating integrity');
+        }
+
+        function addSchedule() {
+            alert('📅 Add Report Schedule\n\nSchedule automation:\n• Set frequency\n• Choose recipients\n• Configure delivery\n• Set parameters\n• Enable notifications\n\nScheduling interface would open.');
+        }
+
+        function editSchedule(type) {
+            alert(`✏️ Edit ${type} Schedule\n\nModify schedule settings:\n• Update frequency\n• Change recipients\n• Modify parameters\n• Adjust timing\n• Update notifications`);
+        }
+
+        // Initialize charts
+        window.addEventListener('load', function() {
+            // Security Chart
+            const securityCtx = document.getElementById('securityChart').getContext('2d');
+            new Chart(securityCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Security Score',
+                        data: [94.2, 95.1, 96.3, 97.8, 98.1, 98.7],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ffffff' } } },
+                    scales: {
+                        x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Threats Chart
+            const threatsCtx = document.getElementById('threatsChart').getContext('2d');
+            new Chart(threatsCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Network', 'Application', 'Container', 'Authentication', 'Data'],
+                    datasets: [{
+                        label: 'Threats Blocked',
+                        data: [342, 198, 156, 89, 67],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ffffff' } } },
+                    scales: {
+                        x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

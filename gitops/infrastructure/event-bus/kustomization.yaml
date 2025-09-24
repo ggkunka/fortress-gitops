@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: event-bus
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security
+
+resources:
+- zookeeper.yaml
+- kafka-cluster.yaml
+- kafka-topics.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/name: event-bus
+    app.kubernetes.io/part-of: mcp-security-platform
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/managed-by: argocd

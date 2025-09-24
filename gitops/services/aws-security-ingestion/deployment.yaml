@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-security-ingestion
+  namespace: mcp-security
+  labels:
+    app: aws-security-ingestion
+    component: ingestion
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aws-security-ingestion
+  template:
+    metadata:
+      labels:
+        app: aws-security-ingestion
+        component: ingestion
+    spec:
+      serviceAccountName: fortress-aws-sa
+      containers:
+      - name: aws-security-ingestion
+        image: ghcr.io/ggkunka/fortress-aws-ingestion:latest
+        ports:
+        - containerPort: 8090
+          name: http
+        env:
+        - name: AWS_DEFAULT_REGION
+          value: "us-east-1"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aws-security-ingestion
+  namespace: mcp-security
+  labels:
+    app: aws-security-ingestion
+    component: ingestion
+spec:
+  selector:
+    app: aws-security-ingestion
+  ports:
+  - port: 8090
+    targetPort: 8090
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-aws-sa
+  namespace: mcp-security
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/FortressSecurityRole

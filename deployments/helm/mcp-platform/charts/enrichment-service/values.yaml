@@ -1,0 +1,75 @@
+# Default values for enrichment-service
+
+replicaCount: 3
+
+image:
+  repository: "mcp-security/enrichment-service"
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8082
+  targetPort: 8082
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 15
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerances: []
+affinity: {}
+
+healthcheck:
+  enabled: true
+  livenessProbe:
+    path: "/health/live"
+    initialDelaySeconds: 45
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  readinessProbe:
+    path: "/health/ready"
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+env:
+  ENRICHMENT_HOST: "0.0.0.0"
+  ENRICHMENT_PORT: "8082"
+  LOG_LEVEL: "info"
+  REDIS_URL: "redis://mcp-platform-redis-master:6379/1"
+  MITRE_API_ENABLED: "true"
+  VIRUSTOTAL_API_ENABLED: "true"
+  THREAT_INTEL_CACHE_TTL: "3600"
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsNonRoot: true
+  runAsUser: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001

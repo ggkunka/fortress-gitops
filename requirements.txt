@@ -1,0 +1,66 @@
+# Core FastAPI and async dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database and ORM
+sqlalchemy==2.0.23
+alembic==1.13.1
+asyncpg==0.29.0
+
+# Caching and task queue
+redis==5.0.1
+celery==5.3.4
+
+# HTTP client and file handling
+httpx==0.25.2
+aiofiles==23.2.1
+python-multipart==0.0.6
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==41.0.8
+bcrypt==4.1.2
+
+# CLI and utilities
+typer==0.9.0
+rich==13.7.0
+click==8.1.7
+
+# Logging and monitoring
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# Kubernetes and Helm
+kubernetes==28.1.0
+pyyaml==6.0.1
+
+# Template engine
+jinja2==3.1.2
+
+# Validation and utilities
+email-validator==2.1.0
+python-dateutil==2.8.2
+validators==0.22.0
+anyio==4.2.0
+tenacity==8.2.3
+
+# Development dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+bandit==1.7.5
+safety==2.3.5
+coverage==7.3.2
+faker==20.1.0
+factory-boy==3.3.0
+respx==0.20.2
+pytest-xdist==3.5.0

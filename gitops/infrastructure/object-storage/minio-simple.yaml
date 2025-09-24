@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: object-storage
+    spec:
+      containers:
+      - name: minio
+        image: quay.io/minio/minio:RELEASE.2023-11-15T20-43-25Z
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - minio server /data --console-address :9001
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          value: mcp-admin
+        - name: MINIO_ROOT_PASSWORD
+          value: McpSecure123!
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 500m
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+      volumes:
+      - name: minio-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  selector:
+    app: minio
+  ports:
+  - name: api
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9001
+    targetPort: 9001
+  type: ClusterIP

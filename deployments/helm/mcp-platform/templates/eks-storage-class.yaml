@@ -1,0 +1,25 @@
+{{- if and (eq (include "mcp-platform.isEKS" .) "true") .Values.kubernetesFlavorConfig.eks.ebs.enabled -}}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "mcp-platform.fullname" . }}-ebs
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: {{ .Values.kubernetesFlavorConfig.eks.ebs.volumeType }}
+  {{- if .Values.kubernetesFlavorConfig.eks.ebs.encrypted }}
+  encrypted: "true"
+  {{- end }}
+  {{- if eq .Values.kubernetesFlavorConfig.eks.ebs.volumeType "gp3" }}
+  iops: {{ .Values.kubernetesFlavorConfig.eks.ebs.iops | quote }}
+  throughput: {{ .Values.kubernetesFlavorConfig.eks.ebs.throughput | quote }}
+  {{- end }}
+  # Ensure volumes are created in the same AZ as the pod
+  csi.storage.k8s.io/fstype: ext4
+{{- end }}

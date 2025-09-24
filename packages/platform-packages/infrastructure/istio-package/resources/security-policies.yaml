@@ -1,0 +1,117 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: default-peer-authentication
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+spec:
+  mtls:
+    mode: STRICT # Enforced when enable_mtls is true
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: mcp-security-jwt
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-jwt
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: mcp-security-platform
+  jwtRules:
+  - issuer: "https://DOMAIN_PLACEHOLDER/auth" # kpt-set: https://${domain}/auth
+    jwksUri: "https://DOMAIN_PLACEHOLDER/auth/.well-known/jwks.json" # kpt-set: https://${domain}/auth/.well-known/jwks.json
+    audiences:
+    - "mcp-security-api"
+    forwardOriginalToken: true
+  - issuer: "https://auth.company.com"
+    jwksUri: "https://auth.company.com/.well-known/jwks.json"
+    audiences:
+    - "mcp-security-api"
+    forwardOriginalToken: true
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mcp-security-authz
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-authz
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+spec:
+  rules:
+  # Allow ingress gateway to access all services
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+  
+  # Allow authenticated users to access API endpoints
+  - from:
+    - source:
+        requestPrincipals: ["*"]
+    to:
+    - operation:
+        paths: ["/api/v1/*"]
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+  
+  # Allow web UI access
+  - from:
+    - source:
+        requestPrincipals: ["*"]
+    to:
+    - operation:
+        paths: ["/", "/static/*", "/manifest.json", "/favicon.ico"]
+        methods: ["GET"]
+  
+  # Allow health checks without authentication
+  - to:
+    - operation:
+        paths: ["/health", "/metrics", "/ready", "/live"]
+        methods: ["GET"]
+  
+  # Admin-only endpoints
+  - from:
+    - source:
+        requestPrincipals: ["*"]
+    to:
+    - operation:
+        paths: ["/api/v1/admin/*"]
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    when:
+    - key: custom.role
+      values: ["admin", "super-admin"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all-default
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: deny-all-default
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: mcp-security-platform
+    kpt.dev/package: istio-service-mesh
+  annotations:
+    config.kubernetes.io/package-path: platform-packages/infrastructure/istio-package
+spec:
+  # This creates a deny-all policy by default
+  # Specific allow rules are defined above

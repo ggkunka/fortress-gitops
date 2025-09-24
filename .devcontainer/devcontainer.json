@@ -1,0 +1,144 @@
+{
+  "name": "MCP Security Platform POC",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+
+  // Features to install
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    }
+  },
+
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-toolsai.jupyter",
+        "ms-azuretools.vscode-docker",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-json",
+        "GitHub.copilot",
+        "eamodio.gitlens",
+        "formulahendry.auto-rename-tag",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.makefile-tools",
+        "humao.rest-client",
+        "rangav.vscode-thunder-client"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "python.sortImports.provider": "isort",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "files.associations": {
+          "*.yml": "yaml",
+          "*.yaml": "yaml"
+        },
+        "yaml.schemas": {
+          "https://json.schemastore.org/kustomization": "kustomization.yaml",
+          "https://json.schemastore.org/chart": "Chart.yaml"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally
+  "forwardPorts": [
+    8000,  // API Gateway
+    8001,  // Auth Service
+    8080,  // Main Services
+    8081,  // GraphQL
+    8082,  // WebSocket
+    8083,  // gRPC
+    9000,  // MinIO Console
+    5432,  // PostgreSQL
+    6379,  // Redis
+    3000   // Frontend UI
+  ],
+
+  "portsAttributes": {
+    "8000": {
+      "label": "API Gateway",
+      "onAutoForward": "notify"
+    },
+    "8001": {
+      "label": "Auth Service"
+    },
+    "8080": {
+      "label": "Core Services"
+    },
+    "8081": {
+      "label": "GraphQL API"
+    },
+    "8082": {
+      "label": "WebSocket API"
+    },
+    "8083": {
+      "label": "gRPC API"
+    },
+    "9000": {
+      "label": "MinIO Console",
+      "onAutoForward": "openBrowserOnce"
+    },
+    "5432": {
+      "label": "PostgreSQL"
+    },
+    "6379": {
+      "label": "Redis"
+    },
+    "3000": {
+      "label": "Frontend UI",
+      "onAutoForward": "openBrowserOnce"
+    }
+  },
+
+  // Lifecycle scripts
+  "postCreateCommand": "pip install --user -r requirements.txt || true; pip install --user pytest pytest-asyncio httpx fastapi uvicorn; mkdir -p logs tmp; chmod +x scripts/*.sh || true; echo 'MCP Security Platform - Codespace ready!'",
+  "postStartCommand": "cd /workspaces/mcp-security-platform && chmod +x scripts/codespace-setup.sh && chmod +x build-all-services.sh && echo 'MCP Security Platform - Starting automatic deployment...' && ./scripts/codespace-setup.sh --auto || echo 'Setup script not found, skipping auto deployment'",
+
+  // Set environment variables
+  "containerEnv": {
+    "KUBECONFIG": "/workspace/.kube/config",
+    "PATH": "${containerWorkspaceFolder}/.local/bin:${localEnv:PATH}",
+    "PYTHONPATH": "${containerWorkspaceFolder}",
+    "MCP_ENV": "development",
+    "MCP_LOG_LEVEL": "debug"
+  },
+
+  // Mount the local Kubernetes config if it exists
+  "mounts": [
+    "source=mcp-platform-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+  ],
+
+  // Ensure VS Code runs as the vscode user
+  "remoteUser": "vscode",
+
+  // Keep container running
+  "shutdownAction": "stopCompose"
+}

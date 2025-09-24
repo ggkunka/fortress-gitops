@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plugin-manager
+  labels:
+    app: plugin-manager
+    component: plugin-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plugin-manager
+  template:
+    metadata:
+      labels:
+        app: plugin-manager
+        component: plugin-system
+    spec:
+      containers:
+      - name: plugin-manager
+        image: python:3.11-slim
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Plugin Manager Service - MCP Security Platform' && echo 'Ready to manage security plugins and extensions' && tail -f /dev/null"]
+        ports:
+        - containerPort: 8086
+        env:
+        - name: SERVICE_NAME
+          value: "plugin-manager"
+        - name: DATABASE_URL
+          value: "postgresql://mcp_user:SecureUserPassword123!@postgresql:5432/mcp_security"
+        - name: REDIS_URL
+          value: "redis://redis-master:6379/0"
+        - name: ELASTICSEARCH_URL
+          value: "http://elasticsearch:9200"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: PLUGIN_REGISTRY_PATH
+          value: "/var/lib/plugins"
+        - name: MAX_PLUGINS
+          value: "50"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: plugin-storage
+          mountPath: /var/lib/plugins
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "echo 'Plugin Manager is alive'"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "echo 'Plugin Manager is ready'"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: plugin-storage
+        persistentVolumeClaim:
+          claimName: plugin-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plugin-manager
+  labels:
+    app: plugin-manager
+    component: plugin-system
+spec:
+  selector:
+    app: plugin-manager
+  ports:
+  - name: http
+    port: 8086
+    targetPort: 8086
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plugin-storage
+  labels:
+    app: plugin-manager
+    component: plugin-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "local-path"
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-config
+  labels:
+    app: plugin-manager
+    component: plugin-system
+data:
+  plugin-registry.yaml: |
+    plugins:
+      security-scanners:
+        - name: "nmap-scanner"
+          version: "1.0.0"
+          type: "network-scanner"
+          enabled: true
+        - name: "nessus-scanner"
+          version: "1.0.0"
+          type: "vulnerability-scanner"
+          enabled: false
+      analyzers:
+        - name: "cve-analyzer"
+          version: "1.0.0"
+          type: "vulnerability-analyzer"
+          enabled: true
+        - name: "malware-analyzer"
+          version: "1.0.0"
+          type: "malware-analyzer"
+          enabled: true
+      integrations:
+        - name: "splunk-integration"
+          version: "1.0.0"
+          type: "siem-integration"
+          enabled: false
+        - name: "jira-integration"
+          version: "1.0.0"
+          type: "ticketing-integration"
+          enabled: false

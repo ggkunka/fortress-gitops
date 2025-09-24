@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-orca-frontend
+  namespace: mcp-security
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head><title>Fortress Security Platform</title>
+    <style>
+    body{font-family:Inter,sans-serif;margin:0;background:#0f0f23;color:#e2e8f0}
+    .header{background:linear-gradient(90deg,#1e293b,#334155);padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+    .logo{font-size:20px;font-weight:700;color:#60a5fa}
+    .sidebar{position:fixed;left:0;top:60px;width:260px;height:calc(100vh-60px);background:#1e293b;border-right:1px solid #475569}
+    .main{margin-left:260px;padding:24px}
+    .nav-item{padding:10px 16px;margin:2px 0;border-radius:6px;cursor:pointer}
+    .nav-item:hover{background:#374151}
+    .nav-item.active{background:#3b82f6;color:white}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:32px}
+    .stat-card{background:linear-gradient(135deg,#1e293b,#334155);border:1px solid #475569;border-radius:12px;padding:20px}
+    .stat-value{font-size:32px;font-weight:700;margin-bottom:4px}
+    .panel{background:#1e293b;border:1px solid #475569;border-radius:12px;padding:20px;margin-top:20px}
+    .critical{color:#ef4444}.high{color:#f59e0b}.success{color:#10b981}
+    </style></head>
+    <body>
+    <div class="header"><div class="logo">🏰 Fortress Security Platform</div>
+    <button onclick="loadData()">Refresh</button></div>
+    <div class="sidebar">
+    <div class="nav-item active">📊 Dashboard</div>
+    <div class="nav-item">🤖 Agents</div>
+    <div class="nav-item">🔍 Vulnerabilities</div>
+    <div class="nav-item">✅ Compliance</div>
+    </div>
+    <div class="main">
+    <h1>Security Dashboard</h1>
+    <div class="stats-grid" id="stats"></div>
+    <div class="panel"><h3>Active Agents</h3><div id="agents"></div></div>
+    <div class="panel"><h3>Vulnerabilities</h3><div id="vulns"></div></div>
+    </div>
+    <script>
+    async function loadData(){
+    try{
+    const dash=await fetch('/api/dashboard');const d=await dash.json();
+    document.getElementById('stats').innerHTML=`
+    <div class="stat-card"><div class="stat-value success">${d.security_score}%</div><div>Security Score</div></div>
+    <div class="stat-card"><div class="stat-value">${d.assets}</div><div>Total Assets</div></div>
+    <div class="stat-card"><div class="stat-value critical">${d.alerts}</div><div>Critical Alerts</div></div>
+    <div class="stat-card"><div class="stat-value success">${d.agents}</div><div>Active Agents</div></div>`;
+    
+    const agents=await fetch('/api/agents');const a=await agents.json();
+    document.getElementById('agents').innerHTML=a.agents.map(ag=>`<div>🟢 ${ag.id} - ${ag.cluster}</div>`).join('');
+    
+    const vulns=await fetch('/api/vulnerabilities');const v=await vulns.json();
+    document.getElementById('vulns').innerHTML=v.vulns.map(vl=>`<div><span class="critical">${vl.cve}</span> - ${vl.asset}</div>`).join('');
+    }catch(e){console.error(e)}}
+    loadData();setInterval(loadData,10000);
+    </script></body></html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-orca-frontend
+  namespace: mcp-security
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-orca-frontend
+  template:
+    metadata:
+      labels:
+        app: fortress-orca-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: html
+        configMap:
+          name: fortress-orca-frontend
+      - name: nginx-conf
+        configMap:
+          name: fortress-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-nginx-config
+  namespace: mcp-security
+data:
+  default.conf: |
+    server {
+        listen 80;
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+        
+        location /api/ {
+            proxy_pass http://fortress-api-gateway:8200/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-orca-frontend
+  namespace: mcp-security
+spec:
+  type: NodePort
+  selector:
+    app: fortress-orca-frontend
+  ports:
+  - port: 80
+    nodePort: 30080

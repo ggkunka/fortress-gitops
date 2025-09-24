@@ -1,0 +1,177 @@
+# Simplified Codespace deployment - reliable with standard Docker images
+global:
+  imageRegistry: ""
+  imageNamespace: ""
+
+# Single replica for all services to fit in Codespace resources
+replicaCount: 1
+
+# Service configurations with correct images
+services:
+  ingestion:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-correlation-engine"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  enrichment:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-risk-assessment"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  gateway:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-websocket-server"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  auth:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-graphql-server"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  analysis:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-response-orchestrator"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+        
+  notification:
+    image:
+      repository: "ghcr.io/ggkunka/mcp-reporting-service"
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+# Use Bitnami Redis from Docker Hub instead of GHCR
+redis:
+  enabled: true
+  image:
+    registry: "docker.io"
+    repository: "bitnami/redis"
+    tag: "7.2"
+    pullPolicy: IfNotPresent
+  auth:
+    enabled: false  # Disable auth for POC simplicity
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "32Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: false
+
+# Use Bitnami PostgreSQL from Docker Hub
+postgresql:
+  enabled: true
+  image:
+    registry: "docker.io"
+    repository: "bitnami/postgresql"
+    tag: "13"
+    pullPolicy: IfNotPresent
+  auth:
+    postgresPassword: "mcp_password"
+    username: "mcp_user"
+    password: "mcp_password"
+    database: "mcp_security"
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+  metrics:
+    enabled: false
+
+# Disable resource-intensive components
+clickhouse:
+  enabled: false
+eventStore:
+  enabled: false
+grafana:
+  enabled: false
+influxdb:
+  enabled: false
+minio:
+  enabled: false
+mongodb:
+  enabled: false
+monitoring:
+  enabled: false
+neo4j:
+  enabled: false
+plugins:
+  enabled: false
+prometheus:
+  enabled: false
+spark:
+  enabled: false
+
+# Simple ingress for local access
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: mcp-platform-gateway
+            port: 8000
+  tls: []

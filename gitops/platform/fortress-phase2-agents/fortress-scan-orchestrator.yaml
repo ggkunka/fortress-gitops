@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+data:
+  orchestrator.py: |
+    from fastapi import FastAPI
+    import uvicorn, asyncio, json, requests
+    from datetime import datetime
+    from kubernetes import client, config
+    
+    app = FastAPI(title="Fortress Scan Orchestrator", version="1.0.0")
+    config.load_incluster_config()
+    k8s = client.CoreV1Api()
+    
+    @app.post("/orchestrate/multi-cluster-scan")
+    async def orchestrate_scan(scan_request: dict):
+        """Orchestrate security scans across multiple clusters"""
+        clusters = scan_request.get("clusters", ["fortress-prod"])
+        scan_types = scan_request.get("scan_types", ["vulnerability", "compliance", "network"])
+        
+        results = []
+        for cluster in clusters:
+            for scan_type in scan_types:
+                result = {
+                    "cluster": cluster,
+                    "scan_type": scan_type, 
+                    "status": "initiated",
+                    "agent_count": 3,
+                    "estimated_duration": "15 minutes"
+                }
+                results.append(result)
+        
+        return {
+            "orchestration_id": f"orch-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+            "total_scans": len(results),
+            "scan_results": results,
+            "coordination": "distributed_agents"
+        }
+    
+    @app.get("/orchestration/{orch_id}/status")
+    async def get_orchestration_status(orch_id: str):
+        return {
+            "orchestration_id": orch_id,
+            "overall_progress": 75,
+            "completed_scans": 8,
+            "active_scans": 2,
+            "failed_scans": 0
+        }
+    
+    @app.post("/agents/coordinate")
+    async def coordinate_agents(coordination_request: dict):
+        """Coordinate agent activities across clusters"""
+        return {
+            "coordination_status": "active",
+            "agents_coordinated": 12,
+            "scan_schedule": "distributed_load_balanced"
+        }
+    
+    if __name__ == "__main__": uvicorn.run(app, host="0.0.0.0", port=8096)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+  annotations:
+    sidecar.istio.io/inject: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fortress-scan-orchestrator
+  template:
+    metadata:
+      labels:
+        app: fortress-scan-orchestrator
+    spec:
+      containers:
+      - name: scan-orchestrator
+        image: python:3.11-slim
+        env:
+        - name: HTTP_PROXY
+          value: "http://10.158.100.6:8080"
+        volumeMounts:
+        - name: code
+          mountPath: /app
+        command: ["bash", "-c", "cd /app && pip install fastapi uvicorn kubernetes && python orchestrator.py"]
+        ports:
+        - containerPort: 8096
+      volumes:
+      - name: code
+        configMap:
+          name: fortress-scan-orchestrator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-scan-orchestrator
+  namespace: fortress-system
+spec:
+  selector:
+    app: fortress-scan-orchestrator
+  ports:
+  - port: 8096

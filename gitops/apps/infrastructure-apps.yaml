@@ -1,0 +1,333 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-stack
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: monitoring-stack
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: observability
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security-monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Monitoring stack (Prometheus, Grafana, Jaeger, Kiali)"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: databases
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: databases
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: data-layer
+  annotations:
+    argocd.argoproj.io/kustomize-build-options: --enable-helm
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: postgresql
+    targetRevision: 12.10.0
+    helm:
+      releaseName: postgresql
+      values: |-
+        auth:
+          username: mcp_user
+          password: SecureUserPassword123!
+          postgresPassword: SecurePassword123!
+          database: mcp_security
+        primary:
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClass: "local-path"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "PostgreSQL database for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: cache
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: redis
+    targetRevision: 18.1.5
+    helm:
+      releaseName: redis
+      values: |-
+        auth:
+          enabled: false
+        master:
+          persistence:
+            enabled: true
+            size: 8Gi
+            storageClass: "local-path"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        replica:
+          replicaCount: 1
+          persistence:
+            enabled: true
+            size: 8Gi
+            storageClass: "local-path"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Redis cache and pub/sub for MCP Security Platform"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: event-bus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: event-bus
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: messaging
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/simple-kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Simple Kafka deployment for event-driven architecture"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: observability
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: monitoring
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/observability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Prometheus and Grafana monitoring stack"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: search-analytics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: search-analytics
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: search
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/search-analytics
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Elasticsearch for search and analytics"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: service-mesh
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mesh
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: networking
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/service-mesh
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "Istio service mesh for advanced networking"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: object-storage
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: object-storage
+    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/component: storage
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mcp-security-platform
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: HEAD
+    path: gitops/infrastructure/object-storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: Description
+    value: "MinIO object storage for files and artifacts"

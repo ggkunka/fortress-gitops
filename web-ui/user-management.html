@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Fortress User Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%); color: #ffffff; min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .user-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem; text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .stat-label { font-size: 0.9rem; opacity: 0.8; }
+        .users-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .users-table th, .users-table td { text-align: left; padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .users-table th { background: rgba(255, 255, 255, 0.05); font-weight: 600; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #00d4ff, #7c3aed); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .role-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .role-admin { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .role-security { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .role-compliance { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .role-analyst { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .role-viewer { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+        .status-active { color: #10b981; }
+        .status-pending { color: #f59e0b; }
+        .btn { background: linear-gradient(135deg, #00d4ff, #7c3aed); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .btn-small { padding: 0.5rem 1rem; font-size: 0.8rem; }
+        .roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+        .role-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; }
+        .role-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        .role-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .role-title { font-size: 1.2rem; font-weight: 700; }
+        .role-description { font-size: 0.9rem; opacity: 0.8; margin-bottom: 1.5rem; line-height: 1.5; }
+        .permissions-list { list-style: none; }
+        .permissions-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.9rem; }
+        .permission-icon { color: #10b981; }
+        .auth-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+        .auth-method { padding: 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; text-align: center; }
+        .auth-icon { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 0 auto 1rem; }
+        .auth-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .auth-description { font-size: 0.9rem; opacity: 0.8; margin-bottom: 1rem; }
+        .auth-status { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.9rem; }
+        .status-enabled { color: #10b981; }
+        .status-disabled { color: #ef4444; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .tab { padding: 0.75rem 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .tab.active { background: linear-gradient(135deg, #00d4ff, #7c3aed); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-users"></i> User Management</h1>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="addUser()">
+                    <i class="fas fa-user-plus"></i> Add User
+                </button>
+                <button class="btn btn-secondary" onclick="bulkImport()">
+                    <i class="fas fa-upload"></i> Bulk Import
+                </button>
+                <button class="btn btn-secondary" onclick="exportUsers()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+
+        <!-- User Statistics -->
+        <div class="user-stats">
+            <div class="stat-card">
+                <div class="stat-value" style="color: #10b981;">247</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #00d4ff;">234</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #f59e0b;">13</div>
+                <div class="stat-label">Pending Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #8b5cf6;">5</div>
+                <div class="stat-label">Roles Defined</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #ef4444;">3</div>
+                <div class="stat-label">Failed Logins</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('users')">Users</div>
+            <div class="tab" onclick="showTab('roles')">Roles & Permissions</div>
+            <div class="tab" onclick="showTab('auth')">Authentication</div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users-tab" class="tab-content active">
+            <div style="background: rgba(255, 255, 255, 0.02); border-radius: 12px; padding: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div style="font-size: 1.5rem; font-weight: 700;">User Directory</div>
+                    <div style="display: flex; gap: 1rem;">
+                        <input type="text" placeholder="Search users..." style="padding: 0.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #ffffff;">
+                        <select style="padding: 0.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #ffffff;">
+                            <option>All Roles</option>
+                            <option>Administrator</option>
+                            <option>Security Analyst</option>
+                        </select>
+                    </div>
+                </div>
+                <table class="users-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <div class="user-avatar">JD</div>
+                                    <div>
+                                        <div style="font-weight: 600;">John Doe</div>
+                                        <div style="font-size: 0.8rem; opacity: 0.7;">Security Administrator</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>john.doe@company.com</td>
+                            <td><span class="role-badge role-admin"><i class="fas fa-shield-alt"></i> Administrator</span></td>
+                            <td><span class="status-active"><i class="fas fa-circle"></i> Active</span></td>
+                            <td>2 hours ago</td>
+                            <td>
+                                <button class="btn btn-secondary btn-small" onclick="editUser('john.doe')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-warning btn-small" onclick="resetPassword('john.doe')">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <div class="user-avatar">SM</div>
+                                    <div>
+                                        <div style="font-weight: 600;">Sarah Miller</div>
+                                        <div style="font-size: 0.8rem; opacity: 0.7;">Senior Security Analyst</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>sarah.miller@company.com</td>
+                            <td><span class="role-badge role-security"><i class="fas fa-search"></i> Security Analyst</span></td>
+                            <td><span class="status-active"><i class="fas fa-circle"></i> Active</span></td>
+                            <td>5 minutes ago</td>
+                            <td>
+                                <button class="btn btn-secondary btn-small" onclick="editUser('sarah.miller')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-warning btn-small" onclick="resetPassword('sarah.miller')">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <div class="user-avatar">EB</div>
+                                    <div>
+                                        <div style="font-weight: 600;">Emily Brown</div>
+                                        <div style="font-size: 0.8rem; opacity: 0.7;">SOC Analyst</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>emily.brown@company.com</td>
+                            <td><span class="role-badge role-analyst"><i class="fas fa-chart-line"></i> SOC Analyst</span></td>
+                            <td><span class="status-pending"><i class="fas fa-clock"></i> Pending</span></td>
+                            <td>Never</td>
+                            <td>
+                                <button class="btn btn-success btn-small" onclick="approveUser('emily.brown')">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-danger btn-small" onclick="rejectUser('emily.brown')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Roles & Permissions Tab -->
+        <div id="roles-tab" class="tab-content">
+            <div class="roles-grid">
+                <div class="role-card">
+                    <div class="role-header">
+                        <div class="role-icon" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div>
+                            <div class="role-title">Administrator</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Full system access</div>
+                        </div>
+                    </div>
+                    <div class="role-description">
+                        Complete administrative access to all platform features, user management, and system configuration.
+                    </div>
+                    <ul class="permissions-list">
+                        <li><i class="fas fa-check permission-icon"></i> User Management</li>
+                        <li><i class="fas fa-check permission-icon"></i> System Configuration</li>
+                        <li><i class="fas fa-check permission-icon"></i> Security Policies</li>
+                        <li><i class="fas fa-check permission-icon"></i> Audit Logs</li>
+                        <li><i class="fas fa-check permission-icon"></i> Integration Management</li>
+                    </ul>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-secondary btn-small" onclick="editRole('admin')">
+                            <i class="fas fa-edit"></i> Edit Role
+                        </button>
+                    </div>
+                </div>
+
+                <div class="role-card">
+                    <div class="role-header">
+                        <div class="role-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div>
+                            <div class="role-title">Security Analyst</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Security operations</div>
+                        </div>
+                    </div>
+                    <div class="role-description">
+                        Access to security monitoring, threat detection, incident response, and vulnerability management.
+                    </div>
+                    <ul class="permissions-list">
+                        <li><i class="fas fa-check permission-icon"></i> Threat Detection</li>
+                        <li><i class="fas fa-check permission-icon"></i> Incident Response</li>
+                        <li><i class="fas fa-check permission-icon"></i> Vulnerability Management</li>
+                        <li><i class="fas fa-check permission-icon"></i> Security Reports</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> User Management</li>
+                    </ul>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-secondary btn-small" onclick="editRole('security')">
+                            <i class="fas fa-edit"></i> Edit Role
+                        </button>
+                    </div>
+                </div>
+
+                <div class="role-card">
+                    <div class="role-header">
+                        <div class="role-icon" style="background: rgba(156, 163, 175, 0.2); color: #9ca3af;">
+                            <i class="fas fa-eye"></i>
+                        </div>
+                        <div>
+                            <div class="role-title">Viewer</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Read-only access</div>
+                        </div>
+                    </div>
+                    <div class="role-description">
+                        Read-only access to dashboards, reports, and security metrics without modification capabilities.
+                    </div>
+                    <ul class="permissions-list">
+                        <li><i class="fas fa-check permission-icon"></i> View Dashboards</li>
+                        <li><i class="fas fa-check permission-icon"></i> View Reports</li>
+                        <li><i class="fas fa-check permission-icon"></i> Export Data</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> Modify Settings</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> User Management</li>
+                    </ul>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-secondary btn-small" onclick="editRole('viewer')">
+                            <i class="fas fa-edit"></i> Edit Role
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Tab -->
+        <div id="auth-tab" class="tab-content">
+            <div style="background: rgba(255, 255, 255, 0.02); border-radius: 12px; padding: 2rem;">
+                <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Authentication Methods</div>
+                <div class="auth-methods">
+                    <div class="auth-method">
+                        <div class="auth-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div class="auth-title">Local Authentication</div>
+                        <div class="auth-description">Username and password authentication with local user database</div>
+                        <div class="auth-status">
+                            <i class="fas fa-check status-enabled"></i>
+                            <span>Enabled</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="configureAuth('local')" style="margin-top: 1rem;">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                    </div>
+
+                    <div class="auth-method">
+                        <div class="auth-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                            <i class="fas fa-id-card"></i>
+                        </div>
+                        <div class="auth-title">LDAP/Active Directory</div>
+                        <div class="auth-description">Enterprise directory service integration for centralized authentication</div>
+                        <div class="auth-status">
+                            <i class="fas fa-check status-enabled"></i>
+                            <span>Enabled</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="configureAuth('ldap')" style="margin-top: 1rem;">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                    </div>
+
+                    <div class="auth-method">
+                        <div class="auth-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="auth-title">SAML 2.0 SSO</div>
+                        <div class="auth-description">Single sign-on integration with SAML 2.0 identity providers</div>
+                        <div class="auth-status">
+                            <i class="fas fa-times status-disabled"></i>
+                            <span>Disabled</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="configureAuth('saml')" style="margin-top: 1rem;">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                    </div>
+
+                    <div class="auth-method">
+                        <div class="auth-icon" style="background: rgba(139, 92, 246, 0.2); color: #8b5cf6;">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <div class="auth-title">Multi-Factor Authentication</div>
+                        <div class="auth-description">TOTP, SMS, and hardware token support for enhanced security</div>
+                        <div class="auth-status">
+                            <i class="fas fa-check status-enabled"></i>
+                            <span>Enabled</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="configureAuth('mfa')" style="margin-top: 1rem;">
+                            <i class="fas fa-cog"></i> Configure
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function addUser() {
+            alert('👤 Add New User\n\nUser creation form:\n• Full name and email\n• Role assignment\n• Department and location\n• Authentication method\n• Initial permissions\n\nUser creation wizard would open here.');
+        }
+
+        function bulkImport() {
+            alert('📥 Bulk User Import\n\nSupported formats:\n• CSV file import\n• LDAP directory sync\n• Active Directory integration\n• SAML user provisioning\n• API-based import\n\nBulk import wizard would open here.');
+        }
+
+        function exportUsers() {
+            alert('📤 Export User Data\n\nExport options:\n• User directory (CSV/Excel)\n• Role assignments\n• Permission matrix\n• Audit logs\n• Authentication settings\n\nExport configuration would open here.');
+        }
+
+        function editUser(username) {
+            alert(`✏️ Edit User: ${username}\n\nEditable fields:\n• Personal information\n• Role assignments\n• Department/location\n• Account status\n• Permission overrides\n\nUser edit form would open here.`);
+        }
+
+        function resetPassword(username) {
+            alert(`🔑 Reset Password: ${username}\n\nPassword reset options:\n• Generate temporary password\n• Send reset email\n• Force password change on next login\n• Enable/disable account\n\nPassword reset confirmation would appear.`);
+        }
+
+        function approveUser(username) {
+            alert(`✅ Approve User: ${username}\n\nUser approval:\n• Account activated\n• Welcome email sent\n• Initial permissions applied\n• Onboarding process initiated\n\nUser has been successfully approved.`);
+        }
+
+        function rejectUser(username) {
+            alert(`❌ Reject User: ${username}\n\nUser rejection:\n• Account request denied\n• Notification email sent\n• Reason for rejection logged\n• Admin notification triggered\n\nUser request has been rejected.`);
+        }
+
+        function editRole(role) {
+            alert(`🔧 Edit Role: ${role}\n\nRole configuration:\n• Permission assignments\n• Access level settings\n• Feature restrictions\n• Data visibility rules\n• Audit requirements\n\nRole editor would open here.`);
+        }
+
+        function configureAuth(method) {
+            alert(`⚙️ Configure ${method} Authentication\n\nConfiguration options:\n• Connection settings\n• Security policies\n• User mapping rules\n• Session management\n• Audit logging\n\nAuthentication configuration would open.`);
+        }
+    </script>
+</body>
+</html>

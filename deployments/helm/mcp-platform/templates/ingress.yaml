@@ -1,0 +1,54 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "mcp-platform.fullname" . -}}
+{{- $svcPort := .Values.services.gateway.service.port -}}
+{{- $ingressApiVersion := include "mcp-platform.ingress.apiVersion" . -}}
+{{- $pathType := include "mcp-platform.ingress.pathType" . -}}
+apiVersion: {{ $ingressApiVersion }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "mcp-platform.labels" . | nindent 4 }}
+  annotations:
+    {{- include "mcp-platform.annotations" . | nindent 4 }}
+    {{- include "mcp-platform.ingressAnnotations" . | nindent 4 }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if and .Values.ingress.className (semverCompare ">=1.18.0" .Capabilities.KubeVersion.Version) }}
+  ingressClassName: {{ .Values.ingress.className | default (include "mcp-platform.ingressClass" .) }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if $pathType }}
+            pathType: {{ $pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19.0" $.Capabilities.KubeVersion.Version }}
+              service:
+                name: {{ if .service }}{{ .service.name }}{{ else }}{{ printf "%s-gateway" $fullName }}{{ end }}
+                port:
+                  number: {{ if .service }}{{ .service.port }}{{ else }}{{ $svcPort }}{{ end }}
+              {{- else }}
+              serviceName: {{ if .service }}{{ .service.name }}{{ else }}{{ printf "%s-gateway" $fullName }}{{ end }}
+              servicePort: {{ if .service }}{{ .service.port }}{{ else }}{{ $svcPort }}{{ end }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

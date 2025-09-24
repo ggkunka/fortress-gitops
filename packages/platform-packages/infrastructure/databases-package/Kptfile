@@ -1,0 +1,75 @@
+apiVersion: kpt.dev/v1
+kind: Kptfile
+metadata:
+  name: databases-infrastructure
+  annotations:
+    config.kubernetes.io/local-config: "true"
+info:
+  description: "Database infrastructure package for MCP Security Platform"
+  keywords:
+  - postgresql
+  - redis
+  - databases
+  - persistence
+  site: https://github.com/ggkunka/mcp-security-platform
+upstream:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/infrastructure/databases-package
+    ref: main
+upstreamLock:
+  type: git
+  git:
+    repo: https://github.com/ggkunka/mcp-security-platform
+    directory: /packages/platform-packages/infrastructure/databases-package
+    ref: main
+    commit: HEAD
+pipeline:
+  mutators:
+  # Apply environment-specific setters
+  - image: gcr.io/kpt-fn/apply-setters:v0.2.0
+    configMap:
+      environment: production # kpt-set: ${environment}
+      postgresql_replicas: "1" # kpt-set: ${postgresql_replicas}
+      postgresql_storage_size: 100Gi # kpt-set: ${postgresql_storage_size}
+      postgresql_cpu_requests: 500m # kpt-set: ${postgresql_cpu_requests}
+      postgresql_memory_requests: 1Gi # kpt-set: ${postgresql_memory_requests}
+      postgresql_cpu_limits: 2000m # kpt-set: ${postgresql_cpu_limits}
+      postgresql_memory_limits: 4Gi # kpt-set: ${postgresql_memory_limits}
+      redis_replicas: "1" # kpt-set: ${redis_replicas}
+      redis_storage_size: 20Gi # kpt-set: ${redis_storage_size}
+      redis_cpu_requests: 100m # kpt-set: ${redis_cpu_requests}
+      redis_memory_requests: 256Mi # kpt-set: ${redis_memory_requests}
+      redis_cpu_limits: 500m # kpt-set: ${redis_cpu_limits}
+      redis_memory_limits: 1Gi # kpt-set: ${redis_memory_limits}
+      storage_class: fast-ssd # kpt-set: ${storage_class}
+  # Generate secure passwords
+  - image: security.company.com/kpt-functions/generate-secrets:v1.0.0
+    configMap:
+      secrets: "postgresql-password,redis-password"
+      length: "32"
+      special_chars: "false"
+  validators:
+  # Validate Kubernetes resources
+  - image: gcr.io/kpt-fn/kubeval:v0.3.0
+    configMap:
+      strict: "true"
+      ignore_missing_schemas: "true"
+  # Validate database configurations
+  - image: security.company.com/kpt-functions/database-validator:v1.0.0
+    configMap:
+      require_backups: "true"
+      require_monitoring: "true"
+      min_storage_size: "10Gi"
+      require_resource_limits: "true"
+  # Security validation
+  - image: security.company.com/kpt-functions/security-validator:v1.0.0
+    configMap:
+      require_encrypted_storage: "true"
+      require_network_policies: "true"
+      require_non_root: "true"
+inventory:
+  namespace: mcp-security
+  name: databases-package-inventory
+  inventoryID: databases-infrastructure

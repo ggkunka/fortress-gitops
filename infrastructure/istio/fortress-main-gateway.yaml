@@ -1,0 +1,99 @@
+# Fortress Main Istio Gateway - External Access Point
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fortress-main-gateway
+  namespace: fortress-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - fortress.local
+    - "10.63.89.182"
+    - "*"
+
+---
+# Main VirtualService for Fortress Platform
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fortress-main
+  namespace: fortress-system
+spec:
+  hosts:
+  - fortress.local
+  - "10.63.89.182"
+  - "*"
+  gateways:
+  - fortress-main-gateway
+  http:
+  # API Routes
+  - match:
+    - uri:
+        prefix: /api/auth/
+    route:
+    - destination:
+        host: fortress-auth
+        port:
+          number: 8001
+  - match:
+    - uri:
+        prefix: /api/scan/
+    route:
+    - destination:
+        host: fortress-scan-orchestrator
+        port:
+          number: 8002
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: fortress-gateway
+        port:
+          number: 80
+  # Web Interface (default)
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: fortress-web
+        port:
+          number: 80
+
+---
+# DestinationRule for Web Interface
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-web
+  namespace: fortress-system
+spec:
+  host: fortress-web
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    loadBalancer:
+      simple: ROUND_ROBIN
+
+---
+# DestinationRule for Auth Service
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fortress-auth
+  namespace: fortress-system
+spec:
+  host: fortress-auth
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    loadBalancer:
+      simple: LEAST_CONN

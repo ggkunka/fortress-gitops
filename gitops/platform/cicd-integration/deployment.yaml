@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-integration
+  labels:
+    app: cicd-integration
+    component: external-integration
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cicd-integration
+  template:
+    metadata:
+      labels:
+        app: cicd-integration
+        component: external-integration
+    spec:
+      containers:
+      - name: cicd-integration
+        image: mcp-security/cicd-integration:latest
+        ports:
+        - containerPort: 8089
+        env:
+        - name: SERVICE_NAME
+          value: "cicd-integration"
+        - name: LOG_LEVEL
+          value: "info"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicd-integration
+  labels:
+    app: cicd-integration
+    component: external-integration
+spec:
+  selector:
+    app: cicd-integration
+  ports:
+  - name: http
+    port: 8089
+    targetPort: 8089
+    protocol: TCP
+  type: ClusterIP

@@ -1,0 +1,77 @@
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: mcp-security-jwt
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: request-authentication
+spec:
+  # Apply to all services
+  jwtRules:
+  - issuer: "https://security.company.com/auth"
+    jwksUri: "https://security.company.com/auth/.well-known/jwks.json"
+    audiences:
+    - "mcp-security-api"
+    - "mcp-security-web"
+    fromHeaders:
+    - name: "Authorization"
+      prefix: "Bearer "
+    fromParams:
+    - "access_token"
+    forwardOriginalToken: true
+    outputPayloadToHeader: "x-jwt-payload"
+  - issuer: "https://auth.company.com"  # External OIDC provider
+    jwksUri: "https://auth.company.com/.well-known/jwks.json"
+    audiences:
+    - "mcp-security"
+    fromHeaders:
+    - name: "Authorization"
+      prefix: "Bearer "
+    forwardOriginalToken: false
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: mcp-security-api-jwt
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: api-request-authentication
+spec:
+  selector:
+    matchLabels:
+      app: mcp-security-api
+  jwtRules:
+  - issuer: "https://security.company.com/auth"
+    jwksUri: "https://security.company.com/auth/.well-known/jwks.json"
+    audiences:
+    - "mcp-security-api"
+    fromHeaders:
+    - name: "Authorization"
+      prefix: "Bearer "
+    - name: "X-API-Key"
+    fromCookies:
+    - "auth_token"
+    forwardOriginalToken: true
+    outputPayloadToHeader: "x-jwt-payload"
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: mcp-security-service-jwt
+  namespace: mcp-security
+  labels:
+    app.kubernetes.io/name: mcp-security-platform
+    app.kubernetes.io/component: service-request-authentication
+spec:
+  # Service-to-service authentication
+  jwtRules:
+  - issuer: "https://security.company.com/internal"
+    jwksUri: "https://security.company.com/internal/.well-known/jwks.json"
+    audiences:
+    - "mcp-security-internal"
+    fromHeaders:
+    - name: "X-Service-Token"
+    forwardOriginalToken: false
+    outputPayloadToHeader: "x-service-jwt-payload"

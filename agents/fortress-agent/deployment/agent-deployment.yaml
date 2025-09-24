@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+    component: security-orchestrator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortress-agent
+  template:
+    metadata:
+      labels:
+        app: fortress-agent
+        component: security-orchestrator
+    spec:
+      serviceAccountName: fortress-agent
+      containers:
+      - name: fortress-agent
+        image: ghcr.io/ggkunka/fortress-agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: FORTRESS_CLUSTER_ID
+          value: "fortress-prod"
+        - name: FORTRESS_PLATFORM_URL
+          value: "https://fortress.security.local"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        volumeMounts:
+        - name: fortress-config
+          mountPath: /etc/fortress
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi" 
+            cpu: "500m"
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          capabilities:
+            add: ["SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE"]
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: fortress-config
+        configMap:
+          name: fortress-agent-config
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortress-agent
+  namespace: fortress-system
+  labels:
+    app: fortress-agent
+spec:
+  selector:
+    app: fortress-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-agent-config
+  namespace: fortress-system
+data:
+  agent.yaml: |
+    agent:
+      cluster_id: "fortress-prod"
+      platform_url: "https://fortress.security.local"
+      scan_timeout: "30m"
+      max_concurrent_scans: 5
+    
+    tools:
+      trivy:
+        enabled: true
+        image: "aquasec/trivy:latest"
+        timeout: "10m"
+      
+      kube-bench:
+        enabled: true
+        image: "aquasec/kube-bench:latest"
+        timeout: "5m"
+      
+      falco:
+        enabled: true
+        image: "falcosecurity/falco-no-driver:latest"
+        timeout: "15m"
+      
+      gitleaks:
+        enabled: true
+        image: "zricethezav/gitleaks:latest"
+        timeout: "10m"

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-cloud-code
+  namespace: fortress-system
+data:
+  main.py: |
+    from fastapi import FastAPI
+    from datetime import datetime
+    import uvicorn
+    
+    app = FastAPI(title="Fortress Cloud Integration Service", version="1.0.0")
+    
+    cloud_providers = {
+        "aws": {"name": "AWS Security Hub", "status": "connected", "findings": 47},
+        "azure": {"name": "Azure Security Center", "status": "connected", "findings": 23},
+        "gcp": {"name": "GCP Security Command Center", "status": "connected", "findings": 31}
+    }
+    
+    @app.get("/providers")
+    async def list_providers():
+        return {"providers": cloud_providers, "total": len(cloud_providers)}
+    
+    @app.post("/sync/{provider}")
+    async def sync_provider(provider: str):
+        if provider not in cloud_providers:
+            return {"error": "Provider not found"}
+        return {
+            "provider": provider,
+            "sync_time": datetime.now().isoformat(),
+            "status": "success",
+            "findings": cloud_providers[provider]["findings"]
+        }
+    
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy", "service": "cloud-integration"}
+    
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=8093)

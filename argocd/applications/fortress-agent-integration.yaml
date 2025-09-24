@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fortress-agent-integration
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ggkunka/mcp-security-platform.git
+    targetRevision: main
+    path: services/agent-fortress-integration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fortress-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+  revisionHistoryLimit: 10

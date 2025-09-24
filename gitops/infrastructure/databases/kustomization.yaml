@@ -1,0 +1,120 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: databases-infrastructure
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: mcp-security
+
+resources:
+- postgresql.yaml
+- redis.yaml
+- database-migrations.yaml
+
+# Helm charts for database deployments
+helmCharts:
+- name: postgresql
+  repo: https://charts.bitnami.com/bitnami
+  version: "12.10.0"
+  releaseName: postgresql
+  namespace: mcp-security
+  valuesInline:
+    auth:
+      postgresPassword: "SecurePassword123!"
+      database: "mcp_security"
+      username: "mcp_user"
+      password: "SecureUserPassword123!"
+    primary:
+      persistence:
+        enabled: true
+        storageClass: "fast-ssd"
+        size: 100Gi
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+      configuration: |
+        max_connections = 200
+        shared_buffers = 1GB
+        effective_cache_size = 3GB
+        maintenance_work_mem = 256MB
+        checkpoint_completion_target = 0.9
+        wal_buffers = 16MB
+        default_statistics_target = 100
+        random_page_cost = 1.1
+        effective_io_concurrency = 200
+        work_mem = 4MB
+        min_wal_size = 1GB
+        max_wal_size = 4GB
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+
+- name: redis
+  repo: https://charts.bitnami.com/bitnami
+  version: "18.1.0"
+  releaseName: redis
+  namespace: mcp-security
+  valuesInline:
+    auth:
+      enabled: true
+      password: "SecureRedisPassword123!"
+    master:
+      persistence:
+        enabled: true
+        storageClass: "fast-ssd"
+        size: 20Gi
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      configuration: |
+        maxmemory 1gb
+        maxmemory-policy allkeys-lru
+        save 900 1
+        save 300 10
+        save 60 10000
+    replica:
+      replicaCount: 1
+      persistence:
+        enabled: true
+        storageClass: "fast-ssd"
+        size: 20Gi
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/name: databases
+  app.kubernetes.io/part-of: mcp-security-platform
+  app.kubernetes.io/managed-by: argocd
+
+# Configuration
+configMapGenerator:
+- name: database-config
+  literals:
+  - DB_HOST=postgresql
+  - DB_PORT=5432
+  - DB_NAME=mcp_security
+  - DB_USER=mcp_user
+  - REDIS_HOST=redis-master
+  - REDIS_PORT=6379
+  - REDIS_SENTINEL_SERVICE=redis-sentinel

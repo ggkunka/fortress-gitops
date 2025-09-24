@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Fortress Threat Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%); color: #ffffff; min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .threat-status { display: flex; align-items: center; gap: 1rem; padding: 1rem 2rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; margin-bottom: 2rem; }
+        .status-icon { font-size: 2rem; color: #10b981; }
+        .status-text { flex: 1; }
+        .status-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; color: #10b981; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem; text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .success { color: #10b981; }
+        .primary { color: #00d4ff; }
+        .warning { color: #f59e0b; }
+        .btn { background: linear-gradient(135deg, #00d4ff, #7c3aed); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .ai-insights { background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }
+        .ai-insights h3 { color: #7c3aed; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .insights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+        .insight-item { background: rgba(255, 255, 255, 0.05); padding: 1.5rem; border-radius: 8px; }
+        .insight-score { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .threat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+        .threat-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; position: relative; }
+        .threat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #00d4ff, #7c3aed); }
+        .threat-severity { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .severity-high { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .severity-medium { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .severity-low { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .threat-metric { display: flex; justify-content: space-between; margin: 0.5rem 0; padding: 0.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .threat-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .threat-actions .btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        .chart-container { position: relative; height: 300px; margin: 1rem 0; }
+        .timeline { background: rgba(255, 255, 255, 0.02); border-radius: 12px; padding: 2rem; }
+        .timeline-item { display: flex; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .timeline-time { font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); min-width: 80px; }
+        .timeline-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .timeline-content { flex: 1; }
+        .timeline-title { font-weight: 600; margin-bottom: 0.25rem; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 2rem; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .live-feed { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 1rem; font-family: monospace; color: #00ff00; max-height: 400px; overflow-y: auto; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-shield-alt"></i> Threat Detection</h1>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="startThreatScan()">
+                    <i class="fas fa-search"></i> Deep Scan
+                </button>
+                <button class="btn btn-secondary" onclick="refreshThreats()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn btn-secondary" onclick="showLiveFeed()">
+                    <i class="fas fa-rss"></i> Live Feed
+                </button>
+            </div>
+        </div>
+
+        <!-- Threat Status -->
+        <div class="threat-status">
+            <div class="status-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="status-text">
+                <div class="status-title">All Systems Secure</div>
+                <div style="opacity: 0.8;">No active threats detected. Last scan: 2 minutes ago</div>
+            </div>
+            <div>
+                <span style="font-size: 0.9rem; opacity: 0.8;">Confidence: </span>
+                <span style="font-size: 1.2rem; font-weight: 700; color: #10b981;">99.8%</span>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value success">0</div>
+                <div class="stat-label">Active Threats</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value primary">1,247</div>
+                <div class="stat-label">Blocked Attacks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success">99.8%</div>
+                <div class="stat-label">Detection Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value success">&lt;2s</div>
+                <div class="stat-label">Response Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value primary">847</div>
+                <div class="stat-label">AI Models</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value warning">0.2%</div>
+                <div class="stat-label">False Positives</div>
+            </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="ai-insights">
+            <h3><i class="fas fa-robot"></i> AI Security Insights</h3>
+            <div class="insights-grid">
+                <div class="insight-item">
+                    <div class="insight-score success">97.3%</div>
+                    <div><strong>Behavioral Analysis</strong></div>
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                        Normal user behavior patterns detected. No anomalies in the last 24 hours.
+                    </div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-score primary">847</div>
+                    <div><strong>ML Models Running</strong></div>
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                        Advanced threat detection models analyzing network traffic and system behavior.
+                    </div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-score warning">3</div>
+                    <div><strong>Anomalies Detected</strong></div>
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                        Minor behavioral anomalies detected but classified as low risk.
+                    </div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-score success">99.2%</div>
+                    <div><strong>Prediction Accuracy</strong></div>
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                        AI models showing high accuracy in threat prediction and classification.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem;">Threat Activity Timeline</h3>
+                <div class="chart-container">
+                    <canvas id="threatChart"></canvas>
+                </div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem;">Attack Vector Analysis</h3>
+                <div class="chart-container">
+                    <canvas id="vectorChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Threats -->
+        <div style="margin-bottom: 2rem;">
+            <h3 style="margin-bottom: 1rem;">Recent Security Events</h3>
+            <div class="threat-grid">
+                <div class="threat-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <h4>Suspicious Network Activity</h4>
+                            <span class="threat-severity severity-medium">
+                                <i class="fas fa-info-circle"></i> MEDIUM
+                            </span>
+                        </div>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Source IP:</span>
+                        <span>192.168.1.45</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Risk Score:</span>
+                        <span style="color: #3b82f6;">6.2/10</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Status:</span>
+                        <span style="color: #10b981;">Mitigated</span>
+                    </div>
+                    <div style="margin: 1rem 0; font-size: 0.9rem; opacity: 0.8;">
+                        Unusual outbound traffic patterns detected. Automatically blocked by AI engine.
+                    </div>
+                    <div class="threat-actions">
+                        <button class="btn btn-secondary" onclick="viewThreat('NET001')">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                        <button class="btn btn-secondary" onclick="investigate('NET001')">
+                            <i class="fas fa-search"></i> Investigate
+                        </button>
+                    </div>
+                </div>
+
+                <div class="threat-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <h4>Failed Authentication</h4>
+                            <span class="threat-severity severity-low">
+                                <i class="fas fa-check-circle"></i> LOW
+                            </span>
+                        </div>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Target:</span>
+                        <span>SSH (port 22)</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Attempts:</span>
+                        <span>15 failed logins</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Status:</span>
+                        <span style="color: #10b981;">Resolved</span>
+                    </div>
+                    <div style="margin: 1rem 0; font-size: 0.9rem; opacity: 0.8;">
+                        Multiple failed SSH attempts from external IP. Source blacklisted.
+                    </div>
+                    <div class="threat-actions">
+                        <button class="btn btn-secondary" onclick="viewThreat('AUTH001')">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                    </div>
+                </div>
+
+                <div class="threat-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <h4>Container Runtime Anomaly</h4>
+                            <span class="threat-severity severity-high">
+                                <i class="fas fa-exclamation-circle"></i> HIGH
+                            </span>
+                        </div>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Container:</span>
+                        <span>web-app-prod-7f8b9</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Risk Score:</span>
+                        <span style="color: #f59e0b;">8.7/10</span>
+                    </div>
+                    <div class="threat-metric">
+                        <span>Status:</span>
+                        <span style="color: #f59e0b;">Investigating</span>
+                    </div>
+                    <div style="margin: 1rem 0; font-size: 0.9rem; opacity: 0.8;">
+                        Privilege escalation detected. Container quarantined for analysis.
+                    </div>
+                    <div class="threat-actions">
+                        <button class="btn btn-secondary" onclick="viewThreat('CONT001')">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                        <button class="btn btn-danger" onclick="quarantine('CONT001')">
+                            <i class="fas fa-lock"></i> Quarantine
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div>
+            <h3 style="margin-bottom: 1rem;">Security Event Timeline</h3>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-time">14:23</div>
+                    <div class="timeline-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Threat Scan Completed</div>
+                        <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">Comprehensive security scan finished. No threats detected.</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-time">12:45</div>
+                    <div class="timeline-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Suspicious Activity Detected</div>
+                        <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">Unusual network traffic from 192.168.1.45. Automatically mitigated.</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-time">11:30</div>
+                    <div class="timeline-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">AI Model Updated</div>
+                        <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">Threat detection models updated with latest intelligence.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Feed Modal -->
+    <div id="liveFeedModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Live Threat Intelligence Feed</h2>
+                <button style="background: none; border: none; color: #ffffff; font-size: 1.5rem; cursor: pointer;" onclick="closeLiveFeed()">&times;</button>
+            </div>
+            <div class="live-feed" id="liveFeed">
+                <div>[18:41:30] [INFO] Threat intelligence feed initialized</div>
+                <div>[18:41:28] [INFO] AI models loaded - 847 models active</div>
+                <div>[18:41:25] [INFO] Behavioral analysis engine started</div>
+            </div>
+            <div style="text-align: right; margin-top: 1rem;">
+                <button class="btn btn-secondary" onclick="closeLiveFeed()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function startThreatScan() {
+            alert('🔍 Deep Threat Scan Initiated\n\nPerforming comprehensive analysis:\n• Network traffic analysis\n• Behavioral pattern detection\n• Container runtime monitoring\n• AI-powered threat intelligence\n\nScan will complete in 5-10 minutes.');
+        }
+
+        function refreshThreats() {
+            alert('✅ Threat data refreshed!\n\nLatest threat intelligence synchronized.\nAll detection models updated.');
+        }
+
+        function showLiveFeed() {
+            document.getElementById('liveFeedModal').classList.add('show');
+        }
+
+        function closeLiveFeed() {
+            document.getElementById('liveFeedModal').classList.remove('show');
+        }
+
+        function viewThreat(id) {
+            alert(`🔍 Threat Analysis: ${id}\n\nDetailed threat information:\n• Risk assessment\n• Attack vectors\n• Mitigation steps\n• Forensic analysis\n\nFull analysis interface would open here.`);
+        }
+
+        function investigate(id) {
+            alert(`🕵️ Investigation: ${id}\n\nStarting forensic investigation:\n• Network traffic analysis\n• System log correlation\n• Behavioral pattern analysis\n• Threat attribution\n\nInvestigation tools launching...`);
+        }
+
+        function quarantine(id) {
+            if (confirm(`⚠️ Quarantine Container: ${id}\n\nThis will isolate the container and stop all network access.\n\nContinue?`)) {
+                alert(`🔒 Container Quarantined\n\nContainer ${id} has been isolated:\n• Network access blocked\n• Process execution stopped\n• Forensic snapshot created\n• Security team notified`);
+            }
+        }
+
+        // Initialize charts
+        window.addEventListener('load', function() {
+            // Threat Timeline Chart
+            const threatCtx = document.getElementById('threatChart').getContext('2d');
+            new Chart(threatCtx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                    datasets: [{
+                        label: 'Threats Detected',
+                        data: [2, 1, 0, 3, 1, 0],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Threats Blocked',
+                        data: [2, 1, 0, 3, 1, 0],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ffffff' } } },
+                    scales: {
+                        x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            // Attack Vector Chart
+            const vectorCtx = document.getElementById('vectorChart').getContext('2d');
+            new Chart(vectorCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Network', 'Application', 'Container', 'Authentication'],
+                    datasets: [{
+                        data: [45, 25, 20, 10],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ffffff' } } }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

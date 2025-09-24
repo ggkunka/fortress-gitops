@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package fortress;
+
+// Security Overview Service
+service FortressSecurity {
+    rpc GetSecurityOverview(SecurityOverviewRequest) returns (SecurityOverviewResponse);
+    rpc GetVulnerabilities(VulnerabilitiesRequest) returns (VulnerabilitiesResponse);
+    rpc GetClusterHealth(ClusterHealthRequest) returns (ClusterHealthResponse);
+    rpc StartSecurityScan(ScanRequest) returns (ScanResponse);
+}
+
+// Messages
+message SecurityOverviewRequest {}
+
+message SecurityOverviewResponse {
+    double overall_score = 1;
+    double vulnerability_score = 2;
+    double compliance_score = 3;
+    double threat_score = 4;
+    int32 total_assets = 5;
+    int32 critical_vulnerabilities = 6;
+    int32 active_threats = 7;
+}
+
+message VulnerabilitiesRequest {
+    string severity = 1;
+    int32 limit = 2;
+    int32 offset = 3;
+}
+
+message Vulnerability {
+    string id = 1;
+    string cve_id = 2;
+    string title = 3;
+    string description = 4;
+    string severity = 5;
+    double cvss_score = 6;
+    string status = 7;
+}
+
+message VulnerabilitiesResponse {
+    repeated Vulnerability vulnerabilities = 1;
+    int32 total_count = 2;
+}
+
+message ClusterHealthRequest {
+    string cluster_id = 1;
+}
+
+message ClusterHealthResponse {
+    string cluster_id = 1;
+    string status = 2;
+    int32 nodes = 3;
+    int32 pods = 4;
+    double cpu_usage = 5;
+    double memory_usage = 6;
+}
+
+message ScanRequest {
+    string cluster_id = 1;
+    string scan_type = 2;
+    repeated string targets = 3;
+}
+
+message ScanResponse {
+    string scan_id = 1;
+    string status = 2;
+    string message = 3;
+}
