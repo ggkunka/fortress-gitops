@@ -23,7 +23,7 @@ function App() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('/api/dashboard/overview');
+        const response = await axios.get('http://10.63.89.182:30080/api/dashboard/overview');
         setData(response.data);
       } catch (error) {
         console.log('Using mock data');
