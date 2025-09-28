@@ -1,0 +1,15 @@
+# Secrets - Never commit actual secrets!
+**/secrets.yaml
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+
+# IDE files
+.vscode/
+.idea/
+
+# Local development
+.env
+.env.local

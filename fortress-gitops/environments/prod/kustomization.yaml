@@ -19,8 +19,9 @@ resources:
 - ../../base/frontend/service.yaml
 # Configuration
 - configmaps.yaml
-- secrets.yaml
 - rbac.yaml
+# Note: Copy secrets-template.yaml to secrets.yaml and uncomment the next line
+# - secrets.yaml
 
 patchesStrategicMerge:
 - prod-patches.yaml
