@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-frontend
+  labels:
+    app: fortress-frontend
+    component: frontend
+    part-of: fortress-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: fortress-frontend
+  template:
+    metadata:
+      labels:
+        app: fortress-frontend
+        component: frontend
+        version: latest
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: fortress-frontend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101  # nginx user
+        fsGroup: 101
+      containers:
+      - name: fortress-frontend
+        image: ghcr.io/ggkunka/fortress-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        env:
+        - name: REACT_APP_API_URL
+          value: "http://fortress-backend:8088"
+        - name: ENVIRONMENT
+          value: "production"
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: fortress-nginx-config
+      imagePullSecrets:
+      - name: ghcr-secret

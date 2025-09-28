@@ -1,0 +1,60 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: fortress-prod
+
+commonLabels:
+  environment: prod
+  managed-by: kustomize
+  app.kubernetes.io/part-of: fortress-platform
+
+resources:
+# Database
+- ../../base/database/postgresql.yaml
+# Backend
+- ../../base/backend/deployment.yaml
+- ../../base/backend/service.yaml
+# Frontend
+- ../../base/frontend/deployment.yaml
+- ../../base/frontend/service.yaml
+# Configuration
+- configmaps.yaml
+- secrets.yaml
+- rbac.yaml
+
+patchesStrategicMerge:
+- prod-patches.yaml
+
+images:
+- name: ghcr.io/ggkunka/fortress-backend
+  newTag: stable
+- name: ghcr.io/ggkunka/fortress-frontend
+  newTag: stable
+
+patches:
+- target:
+    kind: Deployment
+    name: fortress-backend
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: add
+      path: /spec/template/spec/containers/0/env/-
+      value:
+        name: ENVIRONMENT
+        value: production
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: 1Gi
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 2Gi
+
+- target:
+    kind: Deployment
+    name: fortress-frontend
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3

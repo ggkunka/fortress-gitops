@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-config
+  labels:
+    app: fortress-platform
+    component: config
+data:
+  # Backend configuration
+  app.yaml: |
+    database:
+      type: postgresql
+      host: fortress-postgresql
+      port: 5432
+      name: fortress
+      ssl_mode: prefer
+    
+    logging:
+      level: INFO
+      format: json
+      file: /var/log/fortress/app.log
+    
+    security:
+      cors_origins:
+        - "https://fortress.company.com"
+        - "http://localhost:3000"
+      allowed_hosts:
+        - "fortress.company.com"
+        - "fortress-backend"
+    
+    registry:
+      quay:
+        url: "quay-registry.apps.in-iptpstcfxhubcl1.blr.nokia-rdnet.net"
+        project: "ncptb6"
+        timeout: 120
+      
+      cache:
+        ttl: 300  # 5 minutes
+        max_size: 1000
+    
+    deployment_tracking:
+      kubernetes:
+        enabled: true
+        cluster_name: "fortress-cluster"
+      docker:
+        enabled: true
+    
+    monitoring:
+      metrics:
+        enabled: true
+        port: 9090
+        path: /metrics
+      health:
+        enabled: true
+        path: /health
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-nginx-config
+  labels:
+    app: fortress-frontend
+    component: config
+data:
+  default.conf: |
+    upstream backend {
+        server fortress-backend:8088;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Frontend static files
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+            try_files $uri $uri/ /index.html;
+            
+            # Security headers
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "no-referrer-when-downgrade" always;
+            add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+        }
+        
+        # API proxy to backend
+        location /api/ {
+            proxy_pass http://backend/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeouts for long-running operations
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 120s;
+        }
+        
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortress-postgresql-config
+  labels:
+    app: fortress-postgresql
+    component: config
+data:
+  postgresql.conf: |
+    # Fortress PostgreSQL Configuration
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    
+    # Memory settings
+    shared_buffers = 128MB
+    effective_cache_size = 256MB
+    maintenance_work_mem = 64MB
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_min_messages = warning
+    log_min_error_statement = error
+    
+    # Replication (for future HA setup)
+    wal_level = replica
+    max_wal_senders = 3
+    
+    # Performance
+    checkpoint_completion_target = 0.7
+    wal_buffers = 16MB

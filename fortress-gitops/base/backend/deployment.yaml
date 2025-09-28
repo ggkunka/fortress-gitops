@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortress-backend
+  labels:
+    app: fortress-backend
+    component: backend
+    part-of: fortress-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: fortress-backend
+  template:
+    metadata:
+      labels:
+        app: fortress-backend
+        component: backend
+        version: latest
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8088"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: fortress-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: fortress-backend
+        image: ghcr.io/ggkunka/fortress-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8088
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: fortress-database-secret
+              key: database-url
+        - name: QUAY_REGISTRY_URL
+          value: "quay-registry.apps.in-iptpstcfxhubcl1.blr.nokia-rdnet.net"
+        - name: QUAY_PROJECT
+          value: "ncptb6"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: database-volume
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: config-volume
+        configMap:
+          name: fortress-config
+      - name: database-volume
+        persistentVolumeClaim:
+          claimName: fortress-database-pvc
+      imagePullSecrets:
+      - name: ghcr-secret

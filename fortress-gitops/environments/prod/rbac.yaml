@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-backend-sa
+  labels:
+    app: fortress-backend
+    component: backend
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortress-frontend-sa
+  labels:
+    app: fortress-frontend
+    component: frontend
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fortress-deployment-reader
+  labels:
+    app: fortress-platform
+    component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["helm.cattle.io", "fleet.cattle.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fortress-deployment-reader-binding
+  labels:
+    app: fortress-platform
+    component: rbac
+subjects:
+- kind: ServiceAccount
+  name: fortress-backend-sa
+  namespace: fortress-prod
+roleRef:
+  kind: ClusterRole
+  name: fortress-deployment-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fortress-namespace-admin
+  namespace: fortress-prod
+  labels:
+    app: fortress-platform
+    component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "services", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fortress-namespace-admin-binding
+  namespace: fortress-prod
+  labels:
+    app: fortress-platform
+    component: rbac
+subjects:
+- kind: ServiceAccount
+  name: fortress-backend-sa
+  namespace: fortress-prod
+- kind: ServiceAccount
+  name: fortress-frontend-sa
+  namespace: fortress-prod
+roleRef:
+  kind: Role
+  name: fortress-namespace-admin
+  apiGroup: rbac.authorization.k8s.io
