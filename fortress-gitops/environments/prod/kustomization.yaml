@@ -10,21 +10,18 @@ commonLabels:
 
 resources:
 # Database
-- ../../base/database/postgresql.yaml
+- base/database/postgresql.yaml
 # Backend
-- ../../base/backend/deployment.yaml
-- ../../base/backend/service.yaml
+- base/backend/deployment.yaml
+- base/backend/service.yaml
 # Frontend
-- ../../base/frontend/deployment.yaml
-- ../../base/frontend/service.yaml
+- base/frontend/deployment.yaml
+- base/frontend/service.yaml
 # Configuration
 - configmaps.yaml
 - rbac.yaml
 # Note: Copy secrets-template.yaml to secrets.yaml and uncomment the next line
 # - secrets.yaml
-
-patchesStrategicMerge:
-- prod-patches.yaml
 
 images:
 - name: ghcr.io/ggkunka/fortress-backend
