@@ -25,9 +25,9 @@ resources:
 
 images:
 - name: ghcr.io/ggkunka/fortress-backend
-  newTag: stable
+  newTag: latest
 - name: ghcr.io/ggkunka/fortress-frontend
-  newTag: stable
+  newTag: working
 
 patches:
 - target:

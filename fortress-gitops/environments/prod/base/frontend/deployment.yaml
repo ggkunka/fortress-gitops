@@ -48,6 +48,10 @@ spec:
         volumeMounts:
         - name: nginx-config
           mountPath: /etc/nginx/conf.d
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-runtime
+          mountPath: /var/run
         resources:
           requests:
             memory: "128Mi"
@@ -75,5 +79,9 @@ spec:
       - name: nginx-config
         configMap:
           name: fortress-nginx-config
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-runtime
+        emptyDir: {}
       imagePullSecrets:
       - name: ghcr-secret
