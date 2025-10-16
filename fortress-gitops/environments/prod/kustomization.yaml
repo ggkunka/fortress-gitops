@@ -27,7 +27,7 @@ images:
 - name: ghcr.io/ggkunka/fortress-backend
   newTag: v20251016-232423
 - name: ghcr.io/ggkunka/fortress-frontend
-  newTag: v20251016-234034
+  newTag: v20251017-001141
 
 patches:
 - target:
