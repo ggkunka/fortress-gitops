@@ -34,7 +34,7 @@ spec:
         fsGroup: 101
       containers:
       - name: fortress-frontend
-        image: ghcr.io/ggkunka/fortress-frontend:latest
+        image: ghcr.io/ggkunka/fortress-frontend:v20251016-202745
         imagePullPolicy: Always
         ports:
         - containerPort: 80
