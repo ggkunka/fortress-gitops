@@ -25,7 +25,7 @@ resources:
 
 images:
 - name: ghcr.io/ggkunka/fortress-backend
-  newTag: v20251017-085505
+  newTag: v20251017-093354
 - name: ghcr.io/ggkunka/fortress-frontend
   newTag: v20251017-001141
 
